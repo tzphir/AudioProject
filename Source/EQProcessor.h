@@ -9,3 +9,52 @@
 */
 
 #pragma once
+
+#include <JuceHeader.h>
+
+class EQProcessor
+{
+    public:
+
+        enum Band
+        {
+            HighPass = 0,
+            Peak1,
+            Peak2,
+            Peak3,
+            Peak4,
+            LowPass
+        };
+
+        EQProcessor();
+
+        void prepare(const juce::dsp::ProcessSpec& spec);
+        void process(juce::AudioBuffer<float>& buffer);
+        float getSampleRate() const { return sampleRate; }
+
+        void updateBandParameters(int bandIndex, float freq, float gainDb, float Q);
+
+        static float getMagnitudeForFrequency(double frequency, double sampleRate);
+
+
+    private:
+
+        using Filter = juce::dsp::IIR::Filter<float>;
+
+        using CoeffsPtr = Filter::CoefficientsPtr;
+
+        using Coeffs = juce::dsp::IIR::Coefficients<float>;
+
+        // Mono chain
+        using FilterChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter, Filter, Filter>;
+
+        // Use two chains
+        FilterChain leftChannel, rightChannel;
+
+        // fall back sample rate
+        float sampleRate;
+
+        void EQProcessor::updateCoefficients(CoeffsPtr& old, CoeffsPtr& replacements) { *old = *replacements; }
+        
+
+};

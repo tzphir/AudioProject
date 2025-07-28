@@ -1,0 +1,25 @@
+# Build artifacts
+Builds/
+*.exe
+*.vst3
+*.dll
+*.a
+*.lib
+*.obj
+*.pdb
+
+# Visual Studio files
+*.sln
+*.vcxproj*
+*.ipch
+*.db
+*.user
+
+# JUCE backup files
+*.jucer.bak
+
+# OS and IDE clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

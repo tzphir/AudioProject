@@ -4,9 +4,15 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
   <MAINGROUP id="tSSaNu" name="MyProject">
     <GROUP id="{E8E5E9ED-33EA-40D7-0BC6-DDA9BAACD333}" name="Source">
-      <GROUP id="{9E6AC8D2-24D3-9AFA-B3EB-D9E444871C6C}" name="Resources"/>
-      <GROUP id="{F34503ED-365E-A9C7-382C-F5123BCC67A3}" name="UI"/>
-      <GROUP id="{6B00A7E0-B605-98F9-4FD4-2755B87DF009}" name="Processors"/>
+      <FILE id="bzwv7a" name="Constants.h" compile="0" resource="0" file="Source/Constants.h"/>
+      <GROUP id="{F34503ED-365E-A9C7-382C-F5123BCC67A3}" name="UI">
+        <FILE id="mdCWPG" name="EQUI.cpp" compile="1" resource="0" file="Source/EQUI.cpp"/>
+        <FILE id="xJvSZf" name="EQUI.h" compile="0" resource="0" file="Source/EQUI.h"/>
+      </GROUP>
+      <GROUP id="{6B00A7E0-B605-98F9-4FD4-2755B87DF009}" name="Processors">
+        <FILE id="DNCCNC" name="EQProcessor.cpp" compile="1" resource="0" file="Source/EQProcessor.cpp"/>
+        <FILE id="n1EGq8" name="EQProcessor.h" compile="0" resource="0" file="Source/EQProcessor.h"/>
+      </GROUP>
       <FILE id="DAHtaA" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
       <FILE id="A5OCGY" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="fVnxit" name="MainComponent.cpp" compile="1" resource="0"

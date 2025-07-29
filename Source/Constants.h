@@ -9,6 +9,7 @@
 */
 
 #pragma once
+#include <JuceHeader.h>
 
 namespace Constants
 {
@@ -17,8 +18,18 @@ namespace Constants
     // Number of bands.
     constexpr int numBands = 6;
 
+    // Colors of bands
+    inline const juce::Colour bandColours[numBands] = {
+        juce::Colours::purple,
+        juce::Colours::blue,
+        juce::Colours::green,
+        juce::Colours::yellow,
+        juce::Colours::orange,
+        juce::Colours::red
+    };
+
     // Default parameters for each band (index-based)
-    constexpr float defaultFrequencies[numBands] = { 20.0f, 100.0f, 400.0f, 1000.0f, 5000.0f, 18000.0f };
+    constexpr float defaultFrequencies[numBands] = { 33.0f, 100.0f, 350.0f, 1350.0f, 5000.0f, 16000.0f };
     constexpr float defaultGain = 0;
     constexpr float defaultQs[numBands] = { 0.707f, 1.0f, 1.0f,   1.0f,   1.0f,    0.707f };
 

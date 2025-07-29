@@ -33,6 +33,15 @@ void EQUI::paint(juce::Graphics& g)
 
 void EQUI::resized()
 {
+    // Graph node positions
+    auto graphArea = getGraphBounds();
+    for (auto& band : eqNodes)
+    {
+        band.position = {
+            freqToX(band.freq, graphArea),
+            gainToY(band.gain, graphArea)
+        };
+    }
     auto bounds = getLocalBounds();
     int columnWidth = static_cast<int>(bounds.getWidth() * 0.28f);
     auto sliderArea = bounds.removeFromRight(columnWidth);
@@ -62,15 +71,7 @@ void EQUI::resized()
         y += h + spacing * 2;
     }
 
-    // Graph node positions
-    auto graphArea = getGraphBounds();
-    for (auto& band : eqNodes)
-    {
-        band.position = {
-            freqToX(band.freq, graphArea),
-            gainToY(band.gain, graphArea)
-        };
-    }
+    
 }
 
 
@@ -132,7 +133,7 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
     for (float dB = Constants::minDb; dB <= Constants::maxDb; dB += 6.0f)
     {
         float y = juce::jmap(dB, Constants::minDb, Constants::maxDb, (float)bounds.getBottom(), (float)bounds.getY());
-        g.setColour(dB == 0.0 ? juce::Colours::white : juce::Colours::darkgrey);
+        g.setColour(dB == 0.0 ? juce::Colours::whitesmoke : juce::Colours::darkgrey);
 
         if (dB > Constants::minDb && dB < Constants::maxDb)
             g.drawHorizontalLine((int)y, (float)bounds.getX(), (float)bounds.getRight());
@@ -169,15 +170,32 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
             responsePath.lineTo((float)x, y);
     }
 
-    g.setColour(juce::Colours::lime);
+    g.setColour(juce::Colours::white);
     g.strokePath(responsePath, juce::PathStrokeType(2.0f));
 
-    for (auto& node : eqNodes)
+   
+    for (int i = 0; i < eqNodes.size(); i++)
     {
+        auto& node = eqNodes[i];
         node.position = { freqToX(node.freq, bounds), gainToY(node.gain, bounds) };
-        g.setColour((&node - &eqNodes[0]) == nodeUnderMouse ? juce::Colours::yellow : juce::Colours::orange);
-        g.fillEllipse(node.position.x - 5, node.position.y - 5, 10, 10);
+
+        juce::Colour colour = Constants::bandColours[i];
+        if (node.bandIndex == nodeUnderMouse)
+            colour = colour.withAlpha(0.8f);
+
+        g.setColour(colour);
+        g.drawEllipse(node.position.x - 12, node.position.y - 12, 24, 24, 2.0f);
+
+        g.setColour(juce::Colours::white);
+        g.setFont(20.0f);
+
+        juce::String label = juce::String(i + 1);
+        g.drawText(label,
+            node.position.x - 12, node.position.y - 12, 24, 24,  // same rect as ellipse
+            juce::Justification::centred, false);
     }
+
+
 }
 
 // Position to DSP sync

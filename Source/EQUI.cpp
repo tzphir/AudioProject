@@ -35,7 +35,7 @@ void EQUI::resized()
 {
     auto bounds = getLocalBounds();
     int columnWidth = static_cast<int>(bounds.getWidth() * 0.28f);
-    auto sliderArea = bounds.removeFromLeft(columnWidth);
+    auto sliderArea = bounds.removeFromRight(columnWidth);
     sliderArea = sliderArea.reduced(50, 50);
 
     // Use sliderArea for laying out sliders
@@ -81,8 +81,8 @@ juce::Rectangle<int> EQUI::getGraphBounds() const
 {
     auto bounds = getLocalBounds();
     int sliderColumnWidth = static_cast<int>(bounds.getWidth() * 0.28f); // match layout %
-    bounds.removeFromLeft(sliderColumnWidth);
-    return bounds.reduced(10, 20); // match visual margin
+    bounds.removeFromRight(sliderColumnWidth);
+    return bounds.reduced(50, 50); // match visual margin
 }
 
 void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
@@ -96,15 +96,16 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
 
     g.setFont(16.0f);
 
+    // Draw Frequency ticks
     for (int i = 0; i < Constants::numFrequencyLabels; i++)
     {
         double freq = Constants::frequencyGraphLabels[i];
         double normX = std::log10(freq / Constants::minFreq) / std::log10(Constants::maxFreq / Constants::minFreq);
         int x = bounds.getX() + static_cast<int>(normX * bounds.getWidth());
 
-        // Tick mark
-        g.setColour(juce::Colours::white);
-        g.drawLine((float)x, (float)(bounds.getBottom() - 4), (float)x, (float)(bounds.getBottom()), 1.0f);
+        // Tick mark for all except first and last
+        if (i > 0 && i < Constants::numFrequencyLabels - 1)
+            g.drawLine((float)x, (float)(bounds.getBottom() - 4), (float)x, (float)(bounds.getBottom()), 1.0f);
 
         // Label
         juce::String labelText = (freq >= 1000.0)
@@ -114,14 +115,30 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
         g.drawFittedText(labelText, x - 20, bounds.getBottom() + 2, 40, 16, juce::Justification::centred, 1);
     }
 
+    // Draw X axis label
+    juce::String hzLabel = "Hz";
+    int labelWidth = 40;
+    int labelHeight = 16;
+    int centerX = bounds.getCentreX();
+    int yPos = bounds.getBottom() + 30;
+
+    g.drawFittedText(hzLabel,
+        centerX - labelWidth / 2, yPos,
+        labelWidth, labelHeight,
+        juce::Justification::centred,
+        1);
+
+    // Draw Decibel ticks
     for (float dB = Constants::minDb; dB <= Constants::maxDb; dB += 6.0f)
     {
         float y = juce::jmap(dB, Constants::minDb, Constants::maxDb, (float)bounds.getBottom(), (float)bounds.getY());
-        g.setColour(dB == 0.0f ? juce::Colours::white : juce::Colours::darkgrey);
-        g.drawHorizontalLine((int)y, (float)bounds.getX(), (float)bounds.getRight());
+        g.setColour(dB == 0.0 ? juce::Colours::white : juce::Colours::darkgrey);
 
-        juce::String label = juce::String(dB, 0) + " dB";
-        g.drawFittedText(label, bounds.getX() - 40, (int)y - 7, 35, 14, juce::Justification::centredRight, 1);
+        if (dB > Constants::minDb && dB < Constants::maxDb)
+            g.drawHorizontalLine((int)y, (float)bounds.getX(), (float)bounds.getRight());
+
+        juce::String label = dB == 0 ? juce::String(dB, 0) + " dB" : juce::String(dB, 0);
+        g.drawFittedText(label, bounds.getX() - 48, (int)y - 7, 35, 14, juce::Justification::centredRight, 1);
     }
 
 }

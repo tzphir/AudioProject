@@ -54,6 +54,7 @@ class EQUI : public juce::Component,
         //================= Helper functions ====================================//
 
         // Drawing Code
+        juce::Rectangle<int> getGraphBounds() const;
         void drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds);
         void drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds);
 

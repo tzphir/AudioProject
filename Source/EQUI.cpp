@@ -26,54 +26,65 @@ void EQUI::timerCallback()
 
 void EQUI::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().reduced(10, 20);
+    auto bounds = getGraphBounds();
     drawSetup(g, bounds);
     drawFrequencyResponse(g, bounds);
 }
 
 void EQUI::resized()
 {
-    // Layout constants
-    const int margin = 10;
-    const int sliderWidth = 200;
-    const int sliderHeight = 30;
+    auto bounds = getLocalBounds();
+    int columnWidth = static_cast<int>(bounds.getWidth() * 0.28f);
+    auto sliderArea = bounds.removeFromLeft(columnWidth);
+    sliderArea = sliderArea.reduced(50, 50);
+
+    // Use sliderArea for laying out sliders
+    // Use bounds (the remainder) for graph
+
+    // Example: assign slider bounds...
+    int x = sliderArea.getX();
+    int y = sliderArea.getY();
+    const int h = 30;
     const int spacing = 8;
 
-    // Lay out sliders in a vertical column on the left
-    auto area = getLocalBounds().reduced(margin);
-    auto sliderArea = area.removeFromLeft(sliderWidth);
-
-    int y = 0;
     for (auto& band : eqNodes)
     {
-        band.freqSlider.setBounds(sliderArea.withY(y).withHeight(sliderHeight));
-        y += sliderHeight + spacing;
+        band.freqSlider.setBounds(x, y, sliderArea.getWidth(), h);
+        y += h + spacing;
 
         if (band.bandIndex >= EQProcessor::Peak1 && band.bandIndex <= EQProcessor::Peak4)
         {
-            band.gainSlider.setBounds(sliderArea.withY(y).withHeight(sliderHeight));
-            y += sliderHeight + spacing;
+            band.gainSlider.setBounds(x, y, sliderArea.getWidth(), h);
+            y += h + spacing;
         }
 
-        band.qSlider.setBounds(sliderArea.withY(y).withHeight(sliderHeight));
-        y += sliderHeight + spacing * 2;
+        band.qSlider.setBounds(x, y, sliderArea.getWidth(), h);
+        y += h + spacing * 2;
     }
 
-    // The remaining area is for the EQ graph and draggable nodes
-    auto eqGraphBounds = area.reduced(10, 20);
-
-    // Update node positions based on freq/gain values
+    // Graph node positions
+    auto graphArea = getGraphBounds();
     for (auto& band : eqNodes)
     {
-        float x = freqToX(band.freq, eqGraphBounds);
-        float y = gainToY(band.gain, eqGraphBounds);
-        band.position = { x, y };
+        band.position = {
+            freqToX(band.freq, graphArea),
+            gainToY(band.gain, graphArea)
+        };
     }
 }
+
 
 //================= Helper functions ====================================//
 
 // Drawing Code
+juce::Rectangle<int> EQUI::getGraphBounds() const
+{
+    auto bounds = getLocalBounds();
+    int sliderColumnWidth = static_cast<int>(bounds.getWidth() * 0.28f); // match layout %
+    bounds.removeFromLeft(sliderColumnWidth);
+    return bounds.reduced(10, 20); // match visual margin
+}
+
 void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
     // Make background black
@@ -291,9 +302,8 @@ void EQUI::mouseDrag(const juce::MouseEvent& e)
         return;
 
     auto& node = eqNodes[nodeBeingDragged];
-    auto bounds = getLocalBounds().reduced(10, 20);
-
-    node.freq = juce::jlimit<float>((float)Constants::minFreq, (float)Constants::maxFreq, xToFreq(e.position.x, bounds));
+    auto bounds = getGraphBounds();
+    node.freq = juce::jlimit<float>(Constants::minFreq, Constants::maxFreq, xToFreq(e.position.x, bounds));
 
     // Only allow vertical dragging (gain) for peaking filters
     if (node.bandIndex >= EQProcessor::Peak1 && node.bandIndex <= EQProcessor::Peak4)
@@ -307,7 +317,7 @@ void EQUI::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetai
     if (nodeUnderMouse >= 0)
     {
         auto& node = eqNodes[nodeUnderMouse];
-        node.Q = juce::jlimit(Constants::minQ, Constants::maxQ, node.Q + wheel.deltaY * 0.1f);
+        node.Q = juce::jlimit(Constants::minQ, Constants::maxQ, node.Q + wheel.deltaY);
         
         handleNodeChange(node.bandIndex);
     }

@@ -89,7 +89,7 @@ juce::Rectangle<int> EQUI::getGraphBounds() const
 void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
     // Make background black
-    g.fillAll(juce::Colours::black);
+    g.fillAll(juce::Colour::fromRGB(50, 50, 50));
 
     // Draw bounding box
     g.setColour(juce::Colours::white);
@@ -133,7 +133,7 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
     for (float dB = Constants::minDb; dB <= Constants::maxDb; dB += 6.0f)
     {
         float y = juce::jmap(dB, Constants::minDb, Constants::maxDb, (float)bounds.getBottom(), (float)bounds.getY());
-        g.setColour(dB == 0.0 ? juce::Colours::whitesmoke : juce::Colours::darkgrey);
+        g.setColour(dB == 0.0 ? juce::Colours::white.withAlpha(0.9f) : juce::Colours::white.withAlpha(0.5f));
 
         if (dB > Constants::minDb && dB < Constants::maxDb)
             g.drawHorizontalLine((int)y, (float)bounds.getX(), (float)bounds.getRight());
@@ -175,7 +175,12 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
     g.setColour(juce::Colours::white);
     g.strokePath(responsePath, juce::PathStrokeType(2.0f));
 
-   
+    // Draw nodes
+    drawNodes(g, bounds);
+}
+
+void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
+{
     // Draw bands 1 through 6
     for (int i = 0; i < eqNodes.size(); i++)
     {
@@ -183,7 +188,8 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
         node.position = { freqToX(node.freq, bounds), gainToY(node.gain, bounds) };
 
         // fill ellipse with transparent background of appropriate colour
-        g.setColour(Constants::bandColours[i].withAlpha(0.6f));
+        float alpha = (nodeUnderMouse == i) ? 0.9f : 0.6f;
+        g.setColour(Constants::bandColours[i].withAlpha(alpha));
         g.fillEllipse(node.position.x - 12, node.position.y - 12, 24, 24);
 
         // black outline
@@ -218,38 +224,74 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
             node.position.x - 12, node.position.y - 12, 24, 24,
             juce::Justification::centred, false);
 
-        // Finally add some rings to the outside
+        // Add some rings to the outside
         float qNorm = juce::jmap(node.Q, Constants::minQ, Constants::maxQ, 0.0f, 1.0f); // Low Q = wide
         float arcSpanRadians = juce::jmap(
-            qNorm, 
-            0.0f, 
-            1.0f, 
-            0.0f, 
+            qNorm,
+            0.0f,
+            1.0f,
+            0.0f,
             juce::MathConstants<float>::pi / 2.0f); // 0 to 90 degrees
 
         float radius = 12.0f;
-        juce::Path leftArc;
-        juce::Path rightArc;
+        juce::Path upperLeftArc;
+        juce::Path upperRightArc;
+        juce::Path lowerLeftArc;
+        juce::Path lowerRightArc;
 
-        leftArc.addCentredArc(
+        upperLeftArc.addCentredArc(
             node.position.x, node.position.y,
             radius, radius,
-            0.0f,                                // rotation
-            juce::MathConstants<float>::pi - arcSpanRadians,
-            juce::MathConstants<float>::pi       // 180° (left side)
+            0.0f,
+            0.0f,
+            -1 * arcSpanRadians,
+            true
         );
 
-        /*rightArc.addCentredArc(
+        upperRightArc.addCentredArc(
             node.position.x, node.position.y,
             radius, radius,
             0.0f,
             0.0f,
-            arcSpanRadians
-        );*/
+            arcSpanRadians,
+            true
+        );
 
-        g.setColour(Constants::bandColours[i].withAlpha(0.8f));
-        g.strokePath(leftArc, juce::PathStrokeType(2.0f));
-        /*g.strokePath(rightArc, juce::PathStrokeType(2.0f));*/
+        lowerLeftArc.addCentredArc(
+            node.position.x, node.position.y,
+            radius, radius,
+            0.0f,
+            juce::MathConstants<float>::pi,
+            juce::MathConstants<float>::pi + arcSpanRadians,
+            true
+        );
+
+        lowerRightArc.addCentredArc(
+            node.position.x, node.position.y,
+            radius, radius,
+            0.0f,
+            juce::MathConstants<float>::pi,
+            juce::MathConstants<float>::pi - arcSpanRadians,
+            true
+        );
+
+        g.setColour(Constants::bandColours[i]);
+        g.strokePath(upperLeftArc, juce::PathStrokeType(2.0f));
+        g.strokePath(upperRightArc, juce::PathStrokeType(2.0f));
+        g.strokePath(lowerLeftArc, juce::PathStrokeType(2.0f));
+        g.strokePath(lowerRightArc, juce::PathStrokeType(2.0f));
+
+        // Finally, add some contour to the rings
+        float contourRadius = 14.0f;
+        float contourThickness = 2.5f;
+
+        g.setColour(juce::Colours::black);
+        g.drawEllipse(node.position.x - contourRadius,
+            node.position.y - contourRadius,
+            contourRadius * 2.0f,
+            contourRadius * 2.0f,
+            contourThickness);
+
     }
 }
 

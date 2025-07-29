@@ -52,5 +52,5 @@ namespace Constants
 
     // Min and Max bandwidth values
     constexpr float minQ = 0.1f;
-    constexpr float maxQ = 10.0f;
+    constexpr float maxQ = 5.0f;
 }

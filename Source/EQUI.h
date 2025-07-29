@@ -57,6 +57,7 @@ class EQUI : public juce::Component,
         juce::Rectangle<int> getGraphBounds() const;
         void drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds);
         void drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds);
+        void drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds);
 
         // Position to DSP sync
         float freqToX(float freq, juce::Rectangle<int> bounds) const;

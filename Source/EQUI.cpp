@@ -188,7 +188,7 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
         node.position = { freqToX(node.freq, bounds), gainToY(node.gain, bounds) };
 
         // fill ellipse with transparent background of appropriate colour
-        float alpha = (nodeUnderMouse == i) ? 0.9f : 0.6f;
+        float alpha = (nodeUnderMouse == i) ? 0.4f : 0.2f;
         g.setColour(Constants::bandColours[i].withAlpha(alpha));
         g.fillEllipse(node.position.x - 12, node.position.y - 12, 24, 24);
 
@@ -219,19 +219,19 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
         }
 
         // Then draw the number of the band (index + 1)
-        g.setColour(juce::Colours::white);
+        g.setColour(Constants::bandColours[i].interpolatedWith(juce::Colours::white, 0.75f));
         g.drawText(label,
             node.position.x - 12, node.position.y - 12, 24, 24,
             juce::Justification::centred, false);
 
         // Add some rings to the outside
-        float qNorm = juce::jmap(node.Q, Constants::minQ, Constants::maxQ, 0.0f, 1.0f); // Low Q = wide
+        float qNorm = juce::jmap(node.Q, Constants::minQ, Constants::maxQ, 0.0f, 1.0f);
         float arcSpanRadians = juce::jmap(
             qNorm,
             0.0f,
             1.0f,
             0.0f,
-            juce::MathConstants<float>::pi / 2.0f); // 0 to 90 degrees
+            juce::MathConstants<float>::halfPi); // 0 to 90 degrees (in rads)
 
         float radius = 12.0f;
         juce::Path upperLeftArc;
@@ -283,7 +283,7 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
 
         // Finally, add some contour to the rings
         float contourRadius = 14.0f;
-        float contourThickness = 2.5f;
+        float contourThickness = 2.0f;
 
         g.setColour(juce::Colours::black);
         g.drawEllipse(node.position.x - contourRadius,
@@ -291,9 +291,9 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
             contourRadius * 2.0f,
             contourRadius * 2.0f,
             contourThickness);
-
     }
 }
+
 
 // Position to DSP sync
 float EQUI::freqToX(float freq, juce::Rectangle<int> bounds) const
@@ -319,6 +319,7 @@ float EQUI::yToGain(float y, juce::Rectangle<int> bounds) const
     return juce::jmap(y, static_cast<float>(bounds.getBottom()), static_cast<float>(bounds.getY()),
         Constants::minDb, Constants::maxDb);
 }
+
 
 // Basic UI Code
 void EQUI::configureEQSlider(juce::Slider& slider, double min, double max, double step,
@@ -398,6 +399,7 @@ void EQUI::handleNodeChange(int bandIndex)
     // Redraw curve and node position
     repaint();
 }
+
 
 // Mouse Events
 void EQUI::mouseDown(const juce::MouseEvent& e)

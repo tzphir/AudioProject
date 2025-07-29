@@ -3,6 +3,8 @@
 //==============================================================================
 MainComponent::MainComponent()
 {
+
+    addAndMakeVisible(eqUI);
     // Make sure you set the size of the component after
     // you add any child components.
     setSize (800, 600);
@@ -30,24 +32,31 @@ MainComponent::~MainComponent()
 //==============================================================================
 void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRate)
 {
-    // This function will be called when the audio device is started, or when
-    // its settings (i.e. sample rate, block size, etc) are changed.
 
-    // You can use this function to initialise any resources you might need,
-    // but be careful - it will be called on the audio thread, not the GUI thread.
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlockExpected);
+    spec.numChannels = 1;
 
-    // For more details, see the help for AudioProcessor::prepareToPlay()
+    eq.prepare(spec);
+
+    // Sync the EQ bands with the current slider values
+    for (int i = 0; i < eqUI.eqNodes.size(); ++i)
+        eqUI.handleSliderChange(i);
 }
 
 void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill)
 {
-    // Your audio-processing code goes here!
-
-    // For more details, see the help for AudioProcessor::getNextAudioBlock()
-
-    // Right now we are not producing any data, in which case we need to clear the buffer
-    // (to prevent the output of random noise)
-    bufferToFill.clearActiveBufferRegion();
+    juce::AudioBuffer<float> sineWave = generateSineWave(bufferToFill.numSamples, 2);
+    eq.process(sineWave);
+    for (int i = 0; i < bufferToFill.numSamples; ++i)
+    {
+        float leftSample = sineWave.getSample(0, i);
+        float rightSample = sineWave.getSample(1, i);
+        bufferToFill.buffer->setSample(0, i, leftSample);
+        bufferToFill.buffer->setSample(1, i, rightSample);
+        
+    }
 }
 
 void MainComponent::releaseResources()
@@ -69,7 +78,28 @@ void MainComponent::paint (juce::Graphics& g)
 
 void MainComponent::resized()
 {
-    // This is called when the MainContentComponent is resized.
-    // If you add any child components, this is where you should
-    // update their positions.
+    eqUI.setBounds(getLocalBounds());
+}
+
+// ============== Helper functions ============== //
+
+juce::AudioBuffer<float> MainComponent::generateSineWave(int numSamples, int numChannels)
+{
+    static float phase = 0.0f;
+    const float frequency = 440.0f;
+    const float sampleRate = eq.getSampleRate();
+    juce::AudioBuffer<float> tempBuffer(numChannels, numSamples);
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        float sample = std::sin(phase);
+        phase += 2.0f * juce::MathConstants<float>::pi * frequency / sampleRate;
+        if (phase >= 2.0f * juce::MathConstants<float>::pi)
+            phase -= 2.0f * juce::MathConstants<float>::pi;
+
+        tempBuffer.setSample(0, i, sample);
+        tempBuffer.setSample(1, i, sample);
+    }
+
+    return tempBuffer;
 }

@@ -21,34 +21,57 @@ class EQUI : public juce::Component,
         ~EQUI() override = default;
 
         void paint(juce::Graphics& g) override;
-        void resized() override {}
+        void resized() override;
 
-    private:
-        void timerCallback() override;
-        void drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds);
-        void drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds);
-
-        EQProcessor& eq;
-        std::vector<double> magnitudes;
-
-        // Structure for band controls
-        struct BandControls
+        // Structure for an individual node
+        struct EQNode
         {
+            int bandIndex;
+            float freq;
+            float gain;
+            float Q;
             juce::Slider freqSlider;
             juce::Slider gainSlider;
             juce::Slider qSlider;
+            juce::Point<float> position;
         };
 
         // array of 6 Band controls
-        std::array<BandControls, 6> bandControls;
+        std::array<EQNode, 6> eqNodes;
 
-        // ============= Helper functions ============== //
+        void handleSliderChange(int bandIndex);
+        void handleNodeChange(int bandIndex);
 
+    private:
+        void timerCallback() override;
+   
+        EQProcessor& eq;
+        std::vector<double> magnitudes;
+
+        int nodeUnderMouse = -1; // for highlighting
+        int nodeBeingDragged = -1; // current Node
+
+        //================= Helper functions ====================================//
+
+        // Drawing Code
+        void drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds);
+        void drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds);
+
+        // Position to DSP sync
+        float freqToX(float freq, juce::Rectangle<int> bounds) const;
+        float xToFreq(float x, juce::Rectangle<int> bounds) const;
+        float gainToY(float dB, juce::Rectangle<int> bounds) const;
+        float yToGain(float y, juce::Rectangle<int> bounds) const;
+
+        // Basic UI Code
         void configureEQSlider(juce::Slider& slider, double min, double max, double step,
             const juce::String& suffix, double defaultValue);
+        void configureEQNodes();
 
-        void configureAllEQSliders();
-
-        void updateBandFromSliders();
-
+        // Mouse Events
+        void mouseDown(const juce::MouseEvent& event) override;
+        void mouseDrag(const juce::MouseEvent& event) override;
+        void mouseUp(const juce::MouseEvent& event) override;
+        void mouseMove(const juce::MouseEvent& event) override;
+        void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
 };

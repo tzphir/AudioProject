@@ -32,10 +32,9 @@ class EQProcessor
         void process(juce::AudioBuffer<float>& buffer);
         float getSampleRate() const { return sampleRate; }
 
-        void updateBandParameters(int bandIndex, float freq, float gainDb, float Q);
+        void updateEQ(int bandIndex, float freq, float gainDb, float Q);
 
-        static float getMagnitudeForFrequency(double frequency, double sampleRate);
-
+        float getMagnitudeForFrequency(double frequency, double sampleRate) const;
 
     private:
 
@@ -52,8 +51,9 @@ class EQProcessor
         FilterChain leftChannel, rightChannel;
 
         // fall back sample rate
-        float sampleRate;
+        float sampleRate = 44100.0f;
 
+        // DSP -- Change bands
         void EQProcessor::updateCoefficients(CoeffsPtr& old, CoeffsPtr& replacements) { *old = *replacements; }
         
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EQProcessor.h"
+#include "EQUI.h"
 #include <JuceHeader.h>
 
 //==============================================================================
@@ -27,6 +29,13 @@ private:
     //==============================================================================
     // Your private member variables go here...
 
+    // DSP
+    EQProcessor eq;
+
+    // UI
+    EQUI eqUI{ eq };
+
+    juce::AudioBuffer<float> generateSineWave(int numSamples, int numChannels);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

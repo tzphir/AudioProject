@@ -18,7 +18,6 @@ void EQProcessor::prepare(const juce::dsp::ProcessSpec& spec)
     sampleRate = spec.sampleRate;
     leftChannel.prepare(spec);
     rightChannel.prepare(spec);
-
 }
 
 void EQProcessor::process(juce::AudioBuffer<float>& buffer)
@@ -29,11 +28,9 @@ void EQProcessor::process(juce::AudioBuffer<float>& buffer)
 
     leftChannel.process(leftContext);
     rightChannel.process(rightContext);
-
 }
 
-
-void EQProcessor::updateBandParameters(int bandIndex, float freq, float gainDb, float Q)
+void EQProcessor::updateEQ(int bandIndex, float freq, float gainDb, float Q)
 {
     switch (bandIndex)
     {
@@ -93,8 +90,7 @@ void EQProcessor::updateBandParameters(int bandIndex, float freq, float gainDb, 
     }
 }
 
-
-static float EQProcessor::getMagnitudeForFrequency(double frequency, double sampleRate)
+float EQProcessor::getMagnitudeForFrequency(double frequency, double sampleRate) const
 {
     std::complex<double> result(1.0, 0.0);
 
@@ -115,4 +111,3 @@ static float EQProcessor::getMagnitudeForFrequency(double frequency, double samp
 
     return static_cast<float>(std::abs(result));
 }
-

@@ -150,6 +150,7 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
 
     juce::Path responsePath;
 
+    // Get decibel values
     for (int i = 0; i < magnitudes.size(); ++i)
     {
         double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, (double)i / (magnitudes.size() - 1));
@@ -157,6 +158,7 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
         magnitudes[i] = juce::Decibels::gainToDecibels(magnitude);
     }
 
+    // Fetch from magnitude
     for (int i = 0; i < magnitudes.size(); ++i)
     {
         double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, (double)i / (magnitudes.size() - 1));
@@ -174,28 +176,81 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
     g.strokePath(responsePath, juce::PathStrokeType(2.0f));
 
    
+    // Draw bands 1 through 6
     for (int i = 0; i < eqNodes.size(); i++)
     {
         auto& node = eqNodes[i];
         node.position = { freqToX(node.freq, bounds), gainToY(node.gain, bounds) };
 
-        juce::Colour colour = Constants::bandColours[i];
-        if (node.bandIndex == nodeUnderMouse)
-            colour = colour.withAlpha(0.8f);
+        // fill ellipse with transparent background of appropriate colour
+        g.setColour(Constants::bandColours[i].withAlpha(0.6f));
+        g.fillEllipse(node.position.x - 12, node.position.y - 12, 24, 24);
 
-        g.setColour(colour);
-        g.drawEllipse(node.position.x - 12, node.position.y - 12, 24, 24, 2.0f);
+        // black outline
+        g.setColour(juce::Colours::black);
+        g.drawEllipse(node.position.x - 12, node.position.y - 12, 24, 24, 2);
 
         g.setColour(juce::Colours::white);
         g.setFont(20.0f);
 
         juce::String label = juce::String(i + 1);
+
+        // First, draw black outline around the text by offsetting it in all directions
+        g.setColour(juce::Colours::black);
+        for (int dx = -1; dx <= 1; ++dx)
+        {
+            for (int dy = -1; dy <= 1; ++dy)
+            {
+                if (dx != 0 || dy != 0)
+                {
+                    g.drawText(label,
+                        node.position.x - 12 + dx,
+                        node.position.y - 12 + dy,
+                        24, 24,
+                        juce::Justification::centred, false);
+                }
+            }
+        }
+
+        // Then draw the number of the band (index + 1)
+        g.setColour(juce::Colours::white);
         g.drawText(label,
-            node.position.x - 12, node.position.y - 12, 24, 24,  // same rect as ellipse
+            node.position.x - 12, node.position.y - 12, 24, 24,
             juce::Justification::centred, false);
+
+        // Finally add some rings to the outside
+        float qNorm = juce::jmap(node.Q, Constants::minQ, Constants::maxQ, 0.0f, 1.0f); // Low Q = wide
+        float arcSpanRadians = juce::jmap(
+            qNorm, 
+            0.0f, 
+            1.0f, 
+            0.0f, 
+            juce::MathConstants<float>::pi / 2.0f); // 0 to 90 degrees
+
+        float radius = 12.0f;
+        juce::Path leftArc;
+        juce::Path rightArc;
+
+        leftArc.addCentredArc(
+            node.position.x, node.position.y,
+            radius, radius,
+            0.0f,                                // rotation
+            juce::MathConstants<float>::pi - arcSpanRadians,
+            juce::MathConstants<float>::pi       // 180° (left side)
+        );
+
+        /*rightArc.addCentredArc(
+            node.position.x, node.position.y,
+            radius, radius,
+            0.0f,
+            0.0f,
+            arcSpanRadians
+        );*/
+
+        g.setColour(Constants::bandColours[i].withAlpha(0.8f));
+        g.strokePath(leftArc, juce::PathStrokeType(2.0f));
+        /*g.strokePath(rightArc, juce::PathStrokeType(2.0f));*/
     }
-
-
 }
 
 // Position to DSP sync

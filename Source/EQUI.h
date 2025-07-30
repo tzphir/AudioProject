@@ -24,7 +24,6 @@ class EQUI : public juce::Component,
         void resized() override;
 
     private:
-
         // Structure for an individual node
         struct EQNode
         {
@@ -67,8 +66,10 @@ class EQUI : public juce::Component,
         float yToGain(float y, juce::Rectangle<int> bounds) const;
 
         // Basic UI Code
-        void configureEQSlider(juce::Slider& slider, double min, double max, double step,
-            const juce::String& suffix, double defaultValue);
+        void configureEQSlider(juce::Slider& slider, juce::Slider::SliderStyle sliderStyle, 
+            double min, double max, double step,
+            const juce::String& suffix, double defaultValue,
+            juce::Colour colour);
         void configureEQ();
 
         // Mouse Events

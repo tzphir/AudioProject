@@ -14,9 +14,9 @@
 EQUI::EQUI(EQProcessor& processor)
     : eq(processor)
 {
-    startTimerHz(30); // refresh at 30 fps
     configureEQ();
     magnitudes.resize(512); // points across the frequency range
+    startTimerHz(30); // refresh at 30 fps
 }
 
 void EQUI::timerCallback()
@@ -36,8 +36,10 @@ void EQUI::paint(juce::Graphics& g)
 
 void EQUI::resized()
 {
-    // Graph node positions
+    auto bounds = getLocalBounds();
     auto graphArea = getGraphBounds();
+
+    // Sync node positions to graph
     for (auto& band : eqNodes)
     {
         band.position = {
@@ -45,37 +47,47 @@ void EQUI::resized()
             gainToY(band.gain, graphArea)
         };
     }
-    auto bounds = getLocalBounds();
-    int columnWidth = static_cast<int>(bounds.getWidth() * 0.28f);
-    auto sliderArea = bounds.removeFromRight(columnWidth);
-    sliderArea = sliderArea.reduced(50, 50);
 
-    // Use sliderArea for laying out sliders
-    // Use bounds (the remainder) for graph
+    // Right-side slider area (25% width, like before)
+    int columnWidth = static_cast<int>(bounds.getWidth() * 0.25f);
+    auto sliderArea = bounds.removeFromRight(columnWidth).reduced(20, 20);
 
-    // Example: assign slider bounds...
-    int x = sliderArea.getX();
-    int y = sliderArea.getY();
-    const int h = 30;
-    const int spacing = 8;
+    // Divide into 6 equal columns (one per band)
+    int numBands = static_cast<int>(eqNodes.size());
+    int bandWidth = sliderArea.getWidth() / numBands;
 
-    for (auto& band : eqNodes)
+    for (int i = 0; i < numBands; ++i)
     {
-        band.freqSlider.setBounds(x, y, sliderArea.getWidth(), h);
-        y += h + spacing;
+        auto& band = eqNodes[i];
 
+        // Each band's vertical strip
+        juce::Rectangle<int> bandArea = sliderArea.removeFromLeft(bandWidth).reduced(4, 4);
+
+        // Layout: top to bottom
+        int y = bandArea.getY();
+
+        // Label area for band number
+        int labelHeight = 20;
+        y += labelHeight; // skip space for label (you can draw this manually in paint if you like)
+
+        // Gain control or color rectangle
+        int gainHeight = 600;
         if (band.bandIndex >= EQProcessor::Peak1 && band.bandIndex <= EQProcessor::Peak4)
-        {
-            band.gainSlider.setBounds(x, y, sliderArea.getWidth(), h);
-            y += h + spacing;
-        }
+            band.gainSlider.setBounds(bandArea.getCentreX() - 15, y, 30, gainHeight);
+        
+        // else we'll draw colored rect manually in paint
+        y += gainHeight + 10;
 
-        band.qSlider.setBounds(x, y, sliderArea.getWidth(), h);
-        y += h + spacing * 2;
+        // Frequency knob
+        int rotarySize = 60;
+        band.freqSlider.setBounds(bandArea.getCentreX() - rotarySize / 2, y, rotarySize, rotarySize);
+        y += rotarySize + 10;
+
+        // Q knob
+        band.qSlider.setBounds(bandArea.getCentreX() - rotarySize / 2, y, rotarySize, rotarySize);
     }
-
-    
 }
+
 
 
 //================= Helper functions ====================================//
@@ -84,7 +96,7 @@ void EQUI::resized()
 juce::Rectangle<int> EQUI::getGraphBounds() const
 {
     auto bounds = getLocalBounds();
-    int sliderColumnWidth = static_cast<int>(bounds.getWidth() * 0.28f); // match layout %
+    int sliderColumnWidth = static_cast<int>(bounds.getWidth() * 0.25f); // match layout %
     bounds.removeFromRight(sliderColumnWidth);
     return bounds.reduced(50, 50); // match visual margin
 }
@@ -306,7 +318,7 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
         g.strokePath(lowerLeftArc, juce::PathStrokeType(2.0f));
         g.strokePath(lowerRightArc, juce::PathStrokeType(2.0f));
 
-        // Finally, add some contour to the rings
+        // Add some contour to the rings
         float contourRadius = 14.0f;
         float contourThickness = 2.0f;
 
@@ -375,18 +387,23 @@ float EQUI::yToGain(float y, juce::Rectangle<int> bounds) const
 
 
 // Basic UI Code
-void EQUI::configureEQSlider(juce::Slider& slider, double min, double max, double step,
-    const juce::String& suffix, double defaultValue)
+void EQUI::configureEQSlider(juce::Slider& slider, juce::Slider::SliderStyle sliderStyle, 
+    double min, double max, double step,
+    const juce::String& suffix, double defaultValue,
+    juce::Colour colour)
 {
-    slider.setSliderStyle(juce::Slider::LinearHorizontal);
-    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 60, 20);
+    slider.setSliderStyle(sliderStyle);
     slider.setRange(min, max, step);
-    slider.setTextValueSuffix(suffix);
 
     if (suffix == " Hz")
         slider.setSkewFactorFromMidPoint(1000.0);
 
+    slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     slider.setValue(defaultValue);
+    slider.setColour(juce::Slider::thumbColourId, colour);
+    slider.setColour(juce::Slider::trackColourId, colour.withAlpha(0.7f));
+    slider.setColour(juce::Slider::rotarySliderFillColourId, colour);
+    slider.setColour(juce::Slider::rotarySliderOutlineColourId, colour.withAlpha(0.4f));
     addAndMakeVisible(slider);
 }
 
@@ -399,15 +416,21 @@ void EQUI::configureEQ()
         controls.bandIndex = i;
         bool isPeak = (i >= EQProcessor::Peak1 && i <= EQProcessor::Peak4);
 
-        configureEQSlider(controls.freqSlider, Constants::minFreq, Constants::maxFreq, 1.0, " Hz", Constants::defaultFrequencies[i]);
+        configureEQSlider(controls.freqSlider, juce::Slider::SliderStyle::Rotary, 
+            Constants::minFreq, Constants::maxFreq, 1.0, " Hz", Constants::defaultFrequencies[i],
+            Constants::bandColours[i]);
         controls.freq = controls.freqSlider.getValue();
-        configureEQSlider(controls.qSlider, Constants::minQ, Constants::maxQ, 0.1, "", Constants::defaultQs[i]);
+        configureEQSlider(controls.qSlider, juce::Slider::SliderStyle::Rotary, 
+            Constants::minQ, Constants::maxQ, 0.1, "", Constants::defaultQs[i],
+            Constants::bandColours[i]);
         controls.Q = controls.qSlider.getValue();
 
         // High-pass and Low-pass should not have a gain slider, only peaking
         if (isPeak)
         {
-            configureEQSlider(controls.gainSlider, Constants::minDb, Constants::maxDb, 0.1, " dB", Constants::defaultGain);
+            configureEQSlider(controls.gainSlider, juce::Slider::SliderStyle::LinearBarVertical, 
+                Constants::minDb, Constants::maxDb, 0.1, " dB", Constants::defaultGain,
+                Constants::bandColours[i]);
             controls.gain = controls.gainSlider.getValue();
         }
 

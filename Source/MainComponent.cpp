@@ -39,10 +39,6 @@ void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRat
     spec.numChannels = 1;
 
     eq.prepare(spec);
-
-    // Sync the EQ bands with the current slider values
-    for (int i = 0; i < eqUI.eqNodes.size(); ++i)
-        eqUI.handleSliderChange(i);
 }
 
 void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill)

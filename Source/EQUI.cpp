@@ -15,7 +15,7 @@ EQUI::EQUI(EQProcessor& processor)
     : eq(processor)
 {
     startTimerHz(30); // refresh at 30 fps
-    configureEQNodes();
+    configureEQ();
     magnitudes.resize(512); // points across the frequency range
 }
 
@@ -26,6 +26,9 @@ void EQUI::timerCallback()
 
 void EQUI::paint(juce::Graphics& g)
 {
+    // Make background black
+    g.fillAll(juce::Colour::fromRGB(50, 50, 50));
+
     auto bounds = getGraphBounds();
     drawSetup(g, bounds);
     drawFrequencyResponse(g, bounds);
@@ -88,14 +91,23 @@ juce::Rectangle<int> EQUI::getGraphBounds() const
 
 void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
-    // Make background black
-    g.fillAll(juce::Colour::fromRGB(50, 50, 50));
-
     // Draw bounding box
     g.setColour(juce::Colours::white);
     g.drawRect(bounds);
 
+    juce::ColourGradient vignette(
+        juce::Colours::transparentBlack,
+        bounds.getCentreX(), bounds.getCentreY(),            // center point
+        juce::Colours::black,
+        bounds.getX(), bounds.getY(),
+        true // radial
+    );
+
+    g.setGradientFill(vignette);
+    g.fillRect(bounds);
+
     g.setFont(16.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.9f));
 
     // Draw Frequency ticks
     for (int i = 0; i < Constants::numFrequencyLabels; i++)
@@ -113,6 +125,7 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
             ? juce::String(freq / 1000.0, 1) + "k"
             : juce::String((int)freq);
 
+        g.setColour(juce::Colours::white.withAlpha(0.5f));
         g.drawFittedText(labelText, x - 20, bounds.getBottom() + 2, 40, 16, juce::Justification::centred, 1);
     }
 
@@ -123,6 +136,7 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
     int centerX = bounds.getCentreX();
     int yPos = bounds.getBottom() + 30;
 
+    g.setColour(juce::Colours::white.withAlpha(0.9f));
     g.drawFittedText(hzLabel,
         centerX - labelWidth / 2, yPos,
         labelWidth, labelHeight,
@@ -170,6 +184,17 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
             responsePath.startNewSubPath((float)x, y);
         else
             responsePath.lineTo((float)x, y);
+    }
+
+    int focusedBand = (nodeBeingDragged >= 0) ? nodeBeingDragged : nodeUnderMouse;
+    if (focusedBand >= 0 && focusedBand < eqNodes.size())
+    {
+        juce::Path filledPath = responsePath;
+        filledPath.lineTo(freqToX(Constants::maxFreq, bounds), (float)bounds.getBottom());
+        filledPath.lineTo(freqToX(Constants::minFreq, bounds), (float)bounds.getBottom());
+        filledPath.closeSubPath();
+        g.setColour(Constants::bandColours[focusedBand].withAlpha(0.05f));
+        g.fillPath(filledPath);
     }
 
     g.setColour(juce::Colours::white);
@@ -291,6 +316,34 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
             contourRadius * 2.0f,
             contourRadius * 2.0f,
             contourThickness);
+
+        // Draw frequency of single band
+        bool isFocused = (i == nodeUnderMouse || i == nodeBeingDragged);
+
+        if (isFocused)
+        {
+            juce::Path bandPath;
+
+            for (int j = 0; j < magnitudes.size(); ++j)
+            {
+                double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, (double)j / (magnitudes.size() - 1));
+                float magnitude = eq.getMagnitudeForBand(i, freq, eq.getSampleRate());
+                float dB = juce::Decibels::gainToDecibels(magnitude);
+                float y = juce::jmap(juce::jlimit(Constants::minDb, Constants::maxDb, dB),
+                    Constants::minDb, Constants::maxDb,
+                    (float)bounds.getBottom(), (float)bounds.getY());
+                int x = freqToX(freq, bounds);
+
+                if (j == 0)
+                    bandPath.startNewSubPath((float)x, y);
+                else
+                    bandPath.lineTo((float)x, y);
+            }
+
+            g.setColour(Constants::bandColours[i].withAlpha(0.9f));
+            g.strokePath(bandPath, juce::PathStrokeType(2.0f));
+        }
+
     }
 }
 
@@ -337,7 +390,7 @@ void EQUI::configureEQSlider(juce::Slider& slider, double min, double max, doubl
     addAndMakeVisible(slider);
 }
 
-void EQUI::configureEQNodes()
+void EQUI::configureEQ()
 {
     // Set up nodes
     for (int i = 0; i < eqNodes.size(); ++i)
@@ -378,9 +431,6 @@ void EQUI::handleSliderChange(int bandIndex)
         : 0.0f;
 
     eq.updateEQ(bandIndex, c.freq, c.gain, c.Q);
-
-    // Adjust graphic nodes.
-    repaint();
 }
 
 void EQUI::handleNodeChange(int bandIndex)
@@ -395,9 +445,6 @@ void EQUI::handleNodeChange(int bandIndex)
     c.qSlider.setValue(c.Q, juce::dontSendNotification);
     if (c.bandIndex >= EQProcessor::Peak1 && c.bandIndex <= EQProcessor::Peak4)
         c.gainSlider.setValue(c.gain, juce::dontSendNotification);
-
-    // Redraw curve and node position
-    repaint();
 }
 
 

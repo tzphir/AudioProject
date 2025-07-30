@@ -35,6 +35,7 @@ class EQProcessor
         void updateEQ(int bandIndex, float freq, float gainDb, float Q);
 
         float getMagnitudeForFrequency(double frequency, double sampleRate) const;
+        float getMagnitudeForBand(int bandIndex, double frequency, double sampleRate) const;
 
     private:
 

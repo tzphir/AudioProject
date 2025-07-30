@@ -20,8 +20,8 @@ namespace Constants
 
     // Colors of bands
     inline const juce::Colour bandColours[numBands] = {
-        juce::Colour::fromRGB(139, 0, 1255),
-        juce::Colour::fromRGB(0, 0, 255),
+        juce::Colour::fromRGB(177, 73, 238),
+        juce::Colour::fromRGB(0, 162, 255),
         juce::Colour::fromRGB(0, 255, 0),
         juce::Colour::fromRGB(255, 255, 0),
         juce::Colour::fromRGB(255, 127, 0),

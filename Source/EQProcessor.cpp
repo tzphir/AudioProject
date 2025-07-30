@@ -84,7 +84,7 @@ void EQProcessor::updateEQ(int bandIndex, float freq, float gainDb, float Q)
 
         default:
         {
-            DBG("ERROR: Unknown band index " << bandIndex);
+            jassertfalse;
             break;
         }
     }
@@ -111,3 +111,27 @@ float EQProcessor::getMagnitudeForFrequency(double frequency, double sampleRate)
 
     return static_cast<float>(std::abs(result));
 }
+
+float EQProcessor::getMagnitudeForBand(int bandIndex, double frequency, double sampleRate) const
+{
+    const Filter* filter = nullptr;
+
+    switch (bandIndex)
+    {
+        case HighPass: filter = &leftChannel.get<HighPass>(); break;
+        case Peak1:    filter = &leftChannel.get<Peak1>();    break;
+        case Peak2:    filter = &leftChannel.get<Peak2>();    break;
+        case Peak3:    filter = &leftChannel.get<Peak3>();    break;
+        case Peak4:    filter = &leftChannel.get<Peak4>();    break;
+        case LowPass:  filter = &leftChannel.get<LowPass>();  break;
+        default: jassertfalse; return 1.0f;
+    }
+
+    const Coeffs* coeffs = filter->coefficients.get();
+
+    if (coeffs != nullptr)
+        return static_cast<float>(std::abs(coeffs->getMagnitudeForFrequency(frequency, sampleRate)));
+
+    return 1.0f;
+}
+

@@ -23,6 +23,8 @@ class EQUI : public juce::Component,
         void paint(juce::Graphics& g) override;
         void resized() override;
 
+    private:
+
         // Structure for an individual node
         struct EQNode
         {
@@ -38,18 +40,17 @@ class EQUI : public juce::Component,
 
         // array of 6 Band controls
         std::array<EQNode, 6> eqNodes;
-
-        void handleSliderChange(int bandIndex);
-        void handleNodeChange(int bandIndex);
-
-    private:
         void timerCallback() override;
-   
+
         EQProcessor& eq;
         std::vector<double> magnitudes;
 
         int nodeUnderMouse = -1; // for highlighting
         int nodeBeingDragged = -1; // current Node
+
+        // Callback functions
+        void handleSliderChange(int bandIndex);
+        void handleNodeChange(int bandIndex);
 
         //================= Helper functions ====================================//
 
@@ -68,7 +69,7 @@ class EQUI : public juce::Component,
         // Basic UI Code
         void configureEQSlider(juce::Slider& slider, double min, double max, double step,
             const juce::String& suffix, double defaultValue);
-        void configureEQNodes();
+        void configureEQ();
 
         // Mouse Events
         void mouseDown(const juce::MouseEvent& event) override;

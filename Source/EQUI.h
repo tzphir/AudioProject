@@ -68,6 +68,7 @@ class EQUI : public juce::Component,
 
         // Drawing Code
         juce::Rectangle<int> getGraphBounds() const;
+
         void drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds);
         void drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds);
         void drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds);

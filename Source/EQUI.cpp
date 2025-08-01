@@ -32,6 +32,7 @@ void EQUI::paint(juce::Graphics& g)
     auto bounds = getGraphBounds();
     drawSetup(g, bounds);
     drawFrequencyResponse(g, bounds);
+    drawSliderLabels(g);
 }
 
 void EQUI::resized()
@@ -50,39 +51,34 @@ void EQUI::resized()
 
     // Right-side slider area (25% width, like before)
     int columnWidth = static_cast<int>(bounds.getWidth() * 0.25f);
-    auto sliderArea = bounds.removeFromRight(columnWidth).reduced(20, 20);
+    auto sliderArea = bounds.removeFromRight(columnWidth).reduced(20, 100);
 
     // Divide into 6 equal columns (one per band)
-    int numBands = static_cast<int>(eqNodes.size());
-    int bandWidth = sliderArea.getWidth() / numBands;
+    int bandWidth = (sliderArea.getWidth() / Constants::numBands);
 
-    for (int i = 0; i < numBands; ++i)
+    for (int i = 0; i < Constants::numBands; ++i)
     {
         auto& band = eqNodes[i];
 
         // Each band's vertical strip
-        juce::Rectangle<int> bandArea = sliderArea.removeFromLeft(bandWidth).reduced(4, 4);
+        juce::Rectangle<int> bandArea = sliderArea.removeFromLeft(bandWidth).reduced(4, 0);
 
         // Layout: top to bottom
         int y = bandArea.getY();
 
-        // Label area for band number
-        int labelHeight = 20;
-        y += labelHeight; // skip space for label (you can draw this manually in paint if you like)
-
         // Gain control or color rectangle
-        int gainHeight = 600;
+        int gainHeight = 525;
         if (band.bandIndex >= EQProcessor::Peak1 && band.bandIndex <= EQProcessor::Peak4)
-            band.gainSlider.setBounds(bandArea.getCentreX() - 15, y, 30, gainHeight);
+            band.gainSlider.setBounds(bandArea.getCentreX() - 15, y + 30, 30, gainHeight);
         
-        // else we'll draw colored rect manually in paint
-        y += gainHeight + 10;
+        // Space for rotary knobs
+        y += gainHeight + 40;
 
         // Frequency knob
         int rotarySize = 60;
         band.freqSlider.setBounds(bandArea.getCentreX() - rotarySize / 2, y, rotarySize, rotarySize);
-        y += rotarySize + 10;
 
+        y += rotarySize;
         // Q knob
         band.qSlider.setBounds(bandArea.getCentreX() - rotarySize / 2, y, rotarySize, rotarySize);
     }
@@ -98,7 +94,7 @@ juce::Rectangle<int> EQUI::getGraphBounds() const
     auto bounds = getLocalBounds();
     int sliderColumnWidth = static_cast<int>(bounds.getWidth() * 0.25f); // match layout %
     bounds.removeFromRight(sliderColumnWidth);
-    return bounds.reduced(50, 50); // match visual margin
+    return bounds.reduced(100, 100); // match visual margin
 }
 
 void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
@@ -107,9 +103,10 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
     g.setColour(juce::Colours::white);
     g.drawRect(bounds);
 
+    // Implement vignette
     juce::ColourGradient vignette(
-        juce::Colours::transparentBlack,
-        bounds.getCentreX(), bounds.getCentreY(),            // center point
+        juce::Colours::darkgrey,
+        bounds.getCentreX(), bounds.getCentreY(),
         juce::Colours::black,
         bounds.getX(), bounds.getY(),
         true // radial
@@ -117,6 +114,18 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
 
     g.setGradientFill(vignette);
     g.fillRect(bounds);
+
+    // Draw Title
+    juce::String title = "Equalizer";
+    g.setFont(36.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.85f));
+
+    int titleHeight = 24;
+    int titleWidth = 200;
+    int x = bounds.getCentreX() - titleWidth / 2;
+    int y = bounds.getY() - titleHeight - 30;
+
+    g.drawFittedText(title, x, y, titleWidth, titleHeight, juce::Justification::centred, 1);
 
     g.setFont(16.0f);
     g.setColour(juce::Colours::white.withAlpha(0.9f));
@@ -130,11 +139,11 @@ void EQUI::drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
 
         // Tick mark for all except first and last
         if (i > 0 && i < Constants::numFrequencyLabels - 1)
-            g.drawLine((float)x, (float)(bounds.getBottom() - 4), (float)x, (float)(bounds.getBottom()), 1.0f);
+            g.drawLine((float)x, (float)(bounds.getBottom() - 8), (float)x, (float)(bounds.getBottom()), 1.0f);
 
         // Label
         juce::String labelText = (freq >= 1000.0)
-            ? juce::String(freq / 1000.0, 1) + "k"
+            ? juce::String(freq / 1000.0, 0) + "k"
             : juce::String((int)freq);
 
         g.setColour(juce::Colours::white.withAlpha(0.5f));
@@ -179,7 +188,8 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
     // Get decibel values
     for (int i = 0; i < magnitudes.size(); ++i)
     {
-        double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, (double)i / (magnitudes.size() - 1));
+        double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, 
+            (double)i / (magnitudes.size() - 1));
         auto magnitude = eq.getMagnitudeForFrequency(freq, eq.getSampleRate());
         magnitudes[i] = juce::Decibels::gainToDecibels(magnitude);
     }
@@ -187,7 +197,8 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
     // Fetch from magnitude
     for (int i = 0; i < magnitudes.size(); ++i)
     {
-        double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, (double)i / (magnitudes.size() - 1));
+        double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, 
+            (double)i / (magnitudes.size() - 1));
         int x = freqToX(freq, bounds);
         float dB = juce::jlimit(Constants::minDb, Constants::maxDb, (float)magnitudes[i]);
         float y = juce::jmap(dB, Constants::minDb, Constants::maxDb, (float)(bounds.getBottom()), (float)(bounds.getY()));
@@ -198,8 +209,12 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
             responsePath.lineTo((float)x, y);
     }
 
-    int focusedBand = (nodeBeingDragged >= 0) ? nodeBeingDragged : nodeUnderMouse;
-    if (focusedBand >= 0 && focusedBand < eqNodes.size())
+    int focusedBand = (nodeBeingDragged >= 0) ? nodeBeingDragged :
+        (nodeUnderMouse >= 0) ? nodeUnderMouse :
+        hoveredSliderBand;
+
+    // Colour underneath frequency response
+    if (focusedBand >= 0 && focusedBand < Constants::numBands)
     {
         juce::Path filledPath = responsePath;
         filledPath.lineTo(freqToX(Constants::maxFreq, bounds), (float)bounds.getBottom());
@@ -219,7 +234,7 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
 void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
     // Draw bands 1 through 6
-    for (int i = 0; i < eqNodes.size(); i++)
+    for (int i = 0; i < Constants::numBands; i++)
     {
         auto& node = eqNodes[i];
         node.position = { freqToX(node.freq, bounds), gainToY(node.gain, bounds) };
@@ -233,13 +248,11 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
         g.setColour(juce::Colours::black);
         g.drawEllipse(node.position.x - 12, node.position.y - 12, 24, 24, 2);
 
-        g.setColour(juce::Colours::white);
+        // draw black outline around the text by offsetting it in all directions
         g.setFont(20.0f);
-
+        g.setColour(juce::Colours::black);
         juce::String label = juce::String(i + 1);
 
-        // First, draw black outline around the text by offsetting it in all directions
-        g.setColour(juce::Colours::black);
         for (int dx = -1; dx <= 1; ++dx)
         {
             for (int dy = -1; dy <= 1; ++dy)
@@ -329,16 +342,17 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
             contourRadius * 2.0f,
             contourThickness);
 
-        // Draw frequency of single band
-        bool isFocused = (i == nodeUnderMouse || i == nodeBeingDragged);
+        bool isFocused = (i == nodeUnderMouse || i == nodeBeingDragged || i == hoveredSliderBand);
 
         if (isFocused)
         {
+            // Draw the frequency response of the individual band
             juce::Path bandPath;
 
             for (int j = 0; j < magnitudes.size(); ++j)
             {
-                double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, (double)j / (magnitudes.size() - 1));
+                double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, 
+                    (double)j / (magnitudes.size() - 1));
                 float magnitude = eq.getMagnitudeForBand(i, freq, eq.getSampleRate());
                 float dB = juce::Decibels::gainToDecibels(magnitude);
                 float y = juce::jmap(juce::jlimit(Constants::minDb, Constants::maxDb, dB),
@@ -354,10 +368,104 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
 
             g.setColour(Constants::bandColours[i].withAlpha(0.9f));
             g.strokePath(bandPath, juce::PathStrokeType(2.0f));
+
+           // Then, write text for frequency, decibels and bandwidth
+           // Format frequency
+            juce::String freqText = (node.freq >= 1000.0f)
+                ? juce::String(node.freq / 1000.0f, 2) + " kHz"
+                : juce::String((int)node.freq) + " Hz";
+
+            // Format gain
+            bool isPeak = (node.bandIndex >= EQProcessor::Peak1 && node.bandIndex <= EQProcessor::Peak4);
+            juce::String gainText = isPeak
+                ? juce::String(juce::roundToInt(node.gain)) + " dB"
+                : juce::String();
+
+            // Format bandwidth as %
+            float qPercent = juce::jlimit(0.0f, 100.0f,
+                juce::jmap(node.Q, Constants::minQ, Constants::maxQ, 0.0f, 100.0f));
+            juce::String bwText = juce::String((int)qPercent) + "%";
+
+            // Compose lines
+            juce::String line1 = gainText.isNotEmpty()
+                ? freqText + " | " + gainText
+                : freqText;
+            juce::String line2 = bwText;
+
+            // Determine position: below for negative gain, above for positive
+            g.setFont(14.0f);
+            g.setColour(Constants::bandColours[i].withAlpha(0.95f));
+
+            int textWidth = 100;
+            int textHeight = 16;
+            int x = static_cast<int>(node.position.x) - textWidth / 2;
+
+            bool showAbove = node.gain >= 0.0f;
+
+            int y1 = static_cast<int>(node.position.y) + (showAbove ? -52 : 18);  // Line 1
+            int y2 = y1 + textHeight + 2;                                         // Line 2
+
+            g.drawFittedText(line1, x, y1, textWidth, textHeight, juce::Justification::centred, 1);
+            g.drawFittedText(line2, x, y2, textWidth, textHeight, juce::Justification::centred, 1);
         }
 
     }
 }
+
+void EQUI::drawSliderLabels(juce::Graphics& g)
+{
+    auto bounds = getLocalBounds();
+    int columnWidth = static_cast<int>(bounds.getWidth() * 0.25f);
+    auto sliderArea = bounds.removeFromRight(columnWidth).reduced(20, 100);
+    int bandWidth = sliderArea.getWidth() / Constants::numBands;
+
+    for (int i = 0; i < Constants::numBands; ++i)
+    {
+        auto& node = eqNodes[i];
+        int centerX = sliderArea.getX() + i * bandWidth + bandWidth / 2;
+        int y = sliderArea.getY(); // top edge of the slider column
+
+        juce::Point<float> center((float)centerX, (float)y);
+
+        float radius = 18.0f; // 1.5x the original 12.0f
+
+        // Colored transparent fill
+        g.setColour(Constants::bandColours[i].withAlpha(0.6f));
+        g.fillEllipse(center.x - radius, center.y - radius, radius * 2, radius * 2);
+
+        // Black outline
+        g.setColour(juce::Colours::black);
+        g.drawEllipse(center.x - radius, center.y - radius, radius * 2, radius * 2, 3.0f);
+
+        // Label text
+        juce::String label = juce::String(i + 1);
+        g.setFont(30.0f); // Slightly bigger font to match size
+
+        // Draw black outline pass
+        g.setColour(juce::Colours::black);
+        for (int dx = -1; dx <= 1; ++dx)
+        {
+            for (int dy = -1; dy <= 1; ++dy)
+            {
+                if (dx != 0 || dy != 0)
+                {
+                    g.drawText(label,
+                        center.x - radius + dx, center.y - radius + dy,
+                        radius * 2, radius * 2,
+                        juce::Justification::centred, false);
+                }
+            }
+        }
+
+        // Draw foreground label
+        g.setColour(Constants::bandColours[i].interpolatedWith(juce::Colours::white, 0.75f));
+        g.drawText(label,
+            center.x - radius, center.y - radius,
+            radius * 2, radius * 2,
+            juce::Justification::centred, false);
+    }
+}
+
 
 
 // Position to DSP sync
@@ -410,7 +518,7 @@ void EQUI::configureEQSlider(juce::Slider& slider, juce::Slider::SliderStyle sli
 void EQUI::configureEQ()
 {
     // Set up nodes
-    for (int i = 0; i < eqNodes.size(); ++i)
+    for (int i = 0; i < Constants::numBands; ++i)
     {
         auto& controls = eqNodes[i];
         controls.bandIndex = i;
@@ -420,10 +528,18 @@ void EQUI::configureEQ()
             Constants::minFreq, Constants::maxFreq, 1.0, " Hz", Constants::defaultFrequencies[i],
             Constants::bandColours[i]);
         controls.freq = controls.freqSlider.getValue();
+        controls.freqSlider.onHoverChanged = [this, i](bool isHovered)
+            {
+                hoveredSliderBand = isHovered ? i : -1;
+            };
         configureEQSlider(controls.qSlider, juce::Slider::SliderStyle::Rotary, 
             Constants::minQ, Constants::maxQ, 0.1, "", Constants::defaultQs[i],
             Constants::bandColours[i]);
         controls.Q = controls.qSlider.getValue();
+        controls.qSlider.onHoverChanged = [this, i](bool isHovered)
+            {
+                hoveredSliderBand = isHovered ? i : -1;
+            };
 
         // High-pass and Low-pass should not have a gain slider, only peaking
         if (isPeak)
@@ -432,6 +548,10 @@ void EQUI::configureEQ()
                 Constants::minDb, Constants::maxDb, 0.1, " dB", Constants::defaultGain,
                 Constants::bandColours[i]);
             controls.gain = controls.gainSlider.getValue();
+            controls.gainSlider.onHoverChanged = [this, i](bool isHovered)
+                {
+                    hoveredSliderBand = isHovered ? i : -1;
+                };
         }
 
         // Callback functions
@@ -460,7 +580,7 @@ void EQUI::handleNodeChange(int bandIndex)
 {
     auto& c = eqNodes[bandIndex];
 
-    // Update DSP
+    // Update DSP (mouse events already change the node's values)
     eq.updateEQ(c.bandIndex, c.freq, c.gain, c.Q);
 
     // Sync sliders (without triggering callbacks)
@@ -497,6 +617,29 @@ void EQUI::mouseMove(const juce::MouseEvent& e)
             break;
         }
     }
+    
+    // Check if mouse is over a slider label (right panel)
+    auto bounds = getLocalBounds();
+    int columnWidth = static_cast<int>(bounds.getWidth() * 0.25f);
+    auto sliderArea = bounds.removeFromRight(columnWidth).reduced(20, 100);
+    int bandWidth = sliderArea.getWidth() / Constants::numBands;
+
+    for (int i = 0; i < Constants::numBands; ++i)
+    {
+        int centerX = sliderArea.getX() + i * bandWidth + bandWidth / 2;
+        int y = sliderArea.getY();
+        juce::Point<float> center((float)centerX, (float)y);
+        float radius = 18.0f;
+
+        if (e.position.getDistanceFrom(center) < radius)
+        {
+            hoveredSliderBand = i;
+            repaint();
+            return;
+        }
+    }
+
+    hoveredSliderBand = -1;
     repaint();
 }
 

@@ -24,6 +24,22 @@ class EQUI : public juce::Component,
         void resized() override;
 
     private:
+        // Hoverable Slider
+        struct HoverableSlider : public juce::Slider
+        {
+            std::function<void(bool)> onHoverChanged;
+
+            void mouseEnter(const juce::MouseEvent&) override
+            {
+                if (onHoverChanged) onHoverChanged(true);
+            }
+
+            void mouseExit(const juce::MouseEvent&) override
+            {
+                if (onHoverChanged) onHoverChanged(false);
+            }
+        };
+
         // Structure for an individual node
         struct EQNode
         {
@@ -31,9 +47,9 @@ class EQUI : public juce::Component,
             float freq;
             float gain;
             float Q;
-            juce::Slider freqSlider;
-            juce::Slider gainSlider;
-            juce::Slider qSlider;
+            HoverableSlider freqSlider;
+            HoverableSlider gainSlider;
+            HoverableSlider qSlider;
             juce::Point<float> position;
         };
 
@@ -46,10 +62,7 @@ class EQUI : public juce::Component,
 
         int nodeUnderMouse = -1; // for highlighting
         int nodeBeingDragged = -1; // current Node
-
-        // Callback functions
-        void handleSliderChange(int bandIndex);
-        void handleNodeChange(int bandIndex);
+        int hoveredSliderBand = -1; // for slider hovering logic
 
         //================= Helper functions ====================================//
 
@@ -58,6 +71,7 @@ class EQUI : public juce::Component,
         void drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds);
         void drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds);
         void drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds);
+        void drawSliderLabels(juce::Graphics& g);
 
         // Position to DSP sync
         float freqToX(float freq, juce::Rectangle<int> bounds) const;
@@ -71,6 +85,10 @@ class EQUI : public juce::Component,
             const juce::String& suffix, double defaultValue,
             juce::Colour colour);
         void configureEQ();
+
+        // Callback functions
+        void handleSliderChange(int bandIndex);
+        void handleNodeChange(int bandIndex);
 
         // Mouse Events
         void mouseDown(const juce::MouseEvent& event) override;

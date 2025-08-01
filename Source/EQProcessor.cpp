@@ -134,4 +134,3 @@ float EQProcessor::getMagnitudeForBand(int bandIndex, double frequency, double s
 
     return 1.0f;
 }
-

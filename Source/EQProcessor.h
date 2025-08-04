@@ -15,7 +15,6 @@
 class EQProcessor
 {
     public:
-
         enum Band
         {
             HighPass = 0,
@@ -37,6 +36,8 @@ class EQProcessor
         float getMagnitudeForFrequency(double frequency, double sampleRate) const;
         float getMagnitudeForBand(int bandIndex, double frequency, double sampleRate) const;
 
+        void setBandBypass(int bandIndex, bool isEnabled);
+
     private:
 
         using Filter = juce::dsp::IIR::Filter<float>;
@@ -56,6 +57,4 @@ class EQProcessor
 
         // DSP -- Change bands
         void EQProcessor::updateCoefficients(CoeffsPtr& old, CoeffsPtr& replacements) { *old = *replacements; }
-        
-
 };

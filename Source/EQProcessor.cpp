@@ -94,20 +94,21 @@ float EQProcessor::getMagnitudeForFrequency(double frequency, double sampleRate)
 {
     std::complex<double> result(1.0, 0.0);
 
-    auto accumulateMag = [&](const Filter& filter)
-        {
-            const Coeffs* coeffs = filter.coefficients.get();
-            if (coeffs != nullptr)
-                result *= coeffs->getMagnitudeForFrequency(frequency, sampleRate);
-        };
+    auto accumulateMag = [&](const Filter& filter, bool isBypassed)
+    {
+        if (isBypassed) return;
 
-    // assume symmetry, can use left channel only
-    accumulateMag(leftChannel.get<HighPass>());
-    accumulateMag(leftChannel.get<Peak1>());
-    accumulateMag(leftChannel.get<Peak2>());
-    accumulateMag(leftChannel.get<Peak3>());
-    accumulateMag(leftChannel.get<Peak4>());
-    accumulateMag(leftChannel.get<LowPass>());
+        const Coeffs* coeffs = filter.coefficients.get();
+        if (coeffs != nullptr)
+            result *= coeffs->getMagnitudeForFrequency(frequency, sampleRate);
+    };
+
+    accumulateMag(leftChannel.get<HighPass>(), leftChannel.isBypassed<HighPass>());
+    accumulateMag(leftChannel.get<Peak1>(), leftChannel.isBypassed<Peak1>());
+    accumulateMag(leftChannel.get<Peak2>(), leftChannel.isBypassed<Peak2>());
+    accumulateMag(leftChannel.get<Peak3>(), leftChannel.isBypassed<Peak3>());
+    accumulateMag(leftChannel.get<Peak4>(), leftChannel.isBypassed<Peak4>());
+    accumulateMag(leftChannel.get<LowPass>(), leftChannel.isBypassed<LowPass>());
 
     return static_cast<float>(std::abs(result));
 }
@@ -134,3 +135,44 @@ float EQProcessor::getMagnitudeForBand(int bandIndex, double frequency, double s
 
     return 1.0f;
 }
+
+void EQProcessor::setBandBypass(int bandIndex, bool isEnabled)
+{
+    switch (bandIndex)
+    {
+        case HighPass:
+            leftChannel.setBypassed<HighPass>(!isEnabled);
+            rightChannel.setBypassed<HighPass>(!isEnabled);
+            break;
+
+        case Peak1:
+            leftChannel.setBypassed<Peak1>(!isEnabled);
+            rightChannel.setBypassed<Peak1>(!isEnabled);
+            break;
+
+        case Peak2:
+            leftChannel.setBypassed<Peak2>(!isEnabled);
+            rightChannel.setBypassed<Peak2>(!isEnabled);
+            break;
+
+        case Peak3:
+            leftChannel.setBypassed<Peak3>(!isEnabled);
+            rightChannel.setBypassed<Peak3>(!isEnabled);
+            break;
+
+        case Peak4:
+            leftChannel.setBypassed<Peak4>(!isEnabled);
+            rightChannel.setBypassed<Peak4>(!isEnabled);
+            break;
+
+        case LowPass:
+            leftChannel.setBypassed<LowPass>(!isEnabled);
+            rightChannel.setBypassed<LowPass>(!isEnabled);
+            break;
+
+        default:
+            jassertfalse; // invalid band index
+            break;
+        }
+}
+

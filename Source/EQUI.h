@@ -24,6 +24,8 @@ class EQUI : public juce::Component,
         void resized() override;
 
     private:
+        void timerCallback() override;
+
         // Hoverable Slider
         struct HoverableSlider : public juce::Slider
         {
@@ -40,6 +42,30 @@ class EQUI : public juce::Component,
             }
         };
 
+        // Custom Look and Feel
+        struct ToggleLook : public juce::LookAndFeel_V4
+        {
+            juce::Colour colour;
+
+            ToggleLook(juce::Colour c) : colour(c) {}
+
+            void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
+                bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override
+            {
+                auto bounds = button.getLocalBounds().toFloat().reduced(2.0f);
+                g.setColour(colour);
+
+                if (button.getToggleState()) // filled
+                {
+                    g.fillRect(bounds);
+                }
+                else // outline only
+                {
+                    g.drawRect(bounds, 2.0f);
+                }
+            }
+        };
+
         // Structure for an individual node
         struct EQNode
         {
@@ -51,11 +77,14 @@ class EQUI : public juce::Component,
             HoverableSlider gainSlider;
             HoverableSlider qSlider;
             juce::Point<float> position;
+            juce::ToggleButton enableToggle;
+            bool isEnabled;
+
+            std::unique_ptr<ToggleLook> toggleLook;
         };
 
         // array of 6 Band controls
         std::array<EQNode, 6> eqNodes;
-        void timerCallback() override;
 
         EQProcessor& eq;
         std::vector<double> magnitudes;
@@ -68,11 +97,11 @@ class EQUI : public juce::Component,
 
         // Drawing Code
         juce::Rectangle<int> getGraphBounds() const;
-
-        void drawSetup(juce::Graphics& g, juce::Rectangle<int> bounds);
+        juce::Rectangle<int> getSliderBounds() const;
+        void drawGraphSetup(juce::Graphics& g, juce::Rectangle<int> bounds);
         void drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds);
         void drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds);
-        void drawSliderLabels(juce::Graphics& g);
+        void drawLabels(juce::Graphics& g, juce::Rectangle<int> bounds);
 
         // Position to DSP sync
         float freqToX(float freq, juce::Rectangle<int> bounds) const;
@@ -90,6 +119,7 @@ class EQUI : public juce::Component,
         // Callback functions
         void handleSliderChange(int bandIndex);
         void handleNodeChange(int bandIndex);
+        void handleToggleButton(int bandIndex);
 
         // Mouse Events
         void mouseDown(const juce::MouseEvent& event) override;

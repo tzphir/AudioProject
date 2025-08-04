@@ -26,23 +26,61 @@ class EQUI : public juce::Component,
     private:
         void timerCallback() override;
 
-        // Hoverable Slider
-        struct HoverableSlider : public juce::Slider
+        template <typename ComponentType>
+        struct Hoverable : public ComponentType
         {
             std::function<void(bool)> onHoverChanged;
 
-            void mouseEnter(const juce::MouseEvent&) override
+            void mouseEnter(const juce::MouseEvent& e) override
             {
                 if (onHoverChanged) onHoverChanged(true);
+                ComponentType::mouseEnter(e); // preserve default behavior
             }
 
-            void mouseExit(const juce::MouseEvent&) override
+            void mouseExit(const juce::MouseEvent& e) override
             {
                 if (onHoverChanged) onHoverChanged(false);
+                ComponentType::mouseExit(e); // preserve default behavior
             }
         };
 
-        // Custom Look and Feel
+        // Custom Look and Feel for components
+        struct GainLook : public juce::LookAndFeel_V4
+        {
+            juce::Colour colour;
+
+            GainLook(juce::Colour c) : colour(c) {}
+
+            void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
+                float sliderPos,
+                float minSliderPos,
+                float maxSliderPos,
+                const juce::Slider::SliderStyle style,
+                juce::Slider& slider) override
+            {
+                auto bounds = juce::Rectangle<float>((float)x, (float)y, (float)width, (float)height);
+                float radius = 4.0f;
+
+                // Background track
+                g.setColour(juce::Colours::darkgrey.withAlpha(0.4f));
+                g.fillRoundedRectangle(bounds, radius);
+
+                // Filled area (sliderPos is Y in vertical slider)
+                float fillTop = sliderPos;
+                float fillBottom = bounds.getBottom();
+                float filledHeight = fillBottom - fillTop;
+
+                g.setColour(colour.withAlpha(0.8f));
+                g.fillRoundedRectangle(
+                    juce::Rectangle<float>(bounds.getCentreX() - (bounds.getWidth() / 2), fillTop, bounds.getWidth(), filledHeight),
+                    radius);
+
+                // Border
+                g.setColour(juce::Colours::black);
+                g.drawRoundedRectangle(bounds, radius, 2.0f);
+            }
+        };
+
         struct ToggleLook : public juce::LookAndFeel_V4
         {
             juce::Colour colour;
@@ -66,6 +104,41 @@ class EQUI : public juce::Component,
             }
         };
 
+        struct RotaryLook : public juce::LookAndFeel_V4
+        {
+            juce::Colour colour;
+
+            RotaryLook(juce::Colour c) : colour(c) {}
+
+            void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
+                float sliderPosProportional,
+                float rotaryStartAngle, float rotaryEndAngle,
+                juce::Slider&) override
+            {
+                auto bounds = juce::Rectangle<float>(x, y, width, height).reduced(6.0f);
+                auto center = bounds.getCentre();
+                float radius = bounds.getWidth() / 2.0f;
+
+                float angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
+
+                // Background arc
+                juce::Path backgroundArc;
+                backgroundArc.addCentredArc(center.x, center.y, radius, radius,
+                    0.0f, rotaryStartAngle, rotaryEndAngle, true);
+                g.setColour(juce::Colours::darkgrey.withAlpha(0.6f));
+                g.strokePath(backgroundArc, juce::PathStrokeType(4.0f));
+
+                // Value arc
+                juce::Path valueArc;
+                valueArc.addCentredArc(center.x, center.y, radius, radius,
+                    0.0f, rotaryStartAngle, angle, true);
+                g.setColour(colour);
+                g.strokePath(valueArc, juce::PathStrokeType(4.0f));
+
+                // No knob/dot!
+            }
+        };
+
         // Structure for an individual node
         struct EQNode
         {
@@ -73,14 +146,16 @@ class EQUI : public juce::Component,
             float freq;
             float gain;
             float Q;
-            HoverableSlider freqSlider;
-            HoverableSlider gainSlider;
-            HoverableSlider qSlider;
             juce::Point<float> position;
-            juce::ToggleButton enableToggle;
             bool isEnabled;
+            Hoverable<juce::Slider> freqSlider;
+            Hoverable<juce::Slider> gainSlider;
+            Hoverable<juce::Slider> qSlider;
+            Hoverable<juce::ToggleButton> enableToggle;
 
             std::unique_ptr<ToggleLook> toggleLook;
+            std::unique_ptr<RotaryLook> rotaryLook;
+            std::unique_ptr<GainLook> gainLook;
         };
 
         // array of 6 Band controls
@@ -91,7 +166,7 @@ class EQUI : public juce::Component,
 
         int nodeUnderMouse = -1; // for highlighting
         int nodeBeingDragged = -1; // current Node
-        int hoveredSliderBand = -1; // for slider hovering logic
+        int hoveredBand = -1; // for component hovering logic
 
         //================= Helper functions ====================================//
 
@@ -114,7 +189,7 @@ class EQUI : public juce::Component,
             double min, double max, double step,
             const juce::String& suffix, double defaultValue,
             juce::Colour colour);
-        void configureEQ();
+        void configureEQUI();
 
         // Callback functions
         void handleSliderChange(int bandIndex);

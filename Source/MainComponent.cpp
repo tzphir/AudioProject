@@ -77,6 +77,7 @@ void MainComponent::resized()
     eqUI.setBounds(getLocalBounds());
 }
 
+
 // ============== Helper functions ============== //
 
 juce::AudioBuffer<float> MainComponent::generateSineWave(int numSamples, int numChannels)

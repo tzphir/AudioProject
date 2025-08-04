@@ -14,7 +14,7 @@
 EQUI::EQUI(EQProcessor& processor)
     : eq(processor)
 {
-    configureEQ();
+    configureEQUI();
     magnitudes.resize(512); // points across the frequency range
     startTimerHz(30); // refresh at 30 fps
 }
@@ -68,11 +68,10 @@ void EQUI::resized()
         int gainHeight = bandArea.getHeight();
 
         // Width of band
-        int gainWidth = 0.7 * bandArea.getWidth();
+        int gainWidth = 0.7f * bandArea.getWidth();
 
-        // Size gain bands
-        if (band.bandIndex >= EQProcessor::Peak1 && band.bandIndex <= EQProcessor::Peak4)
-            band.gainSlider.setBounds(bandArea.getCentreX() - (gainWidth / 2), y, gainWidth, gainHeight);
+        // Set bounds
+        band.gainSlider.setBounds(bandArea.getCentreX() - (gainWidth / 2), y, gainWidth, gainHeight);
 
         // Bounds for toggle button
         int toggleButtonHeight = getLocalBounds().getHeight() * 0.015;
@@ -89,10 +88,10 @@ void EQUI::resized()
             toggleButtonHeight);
 
         // Space for rotary knobs
-        y += toggleButtonHeight;
+        y += toggleButtonHeight * 2;
 
         // Frequency knob
-        int rotarySize = getLocalBounds().getHeight() * 0.065;
+        int rotarySize = getLocalBounds().getHeight() * 0.05;
         band.freqSlider.setBounds(bandArea.getCentreX() - rotarySize / 2, y, rotarySize, rotarySize);
 
         y += rotarySize;
@@ -238,7 +237,7 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
 
     int focusedBand = (nodeBeingDragged >= 0) ? nodeBeingDragged :
         (nodeUnderMouse >= 0) ? nodeUnderMouse :
-        hoveredSliderBand;
+        hoveredBand;
 
     // Colour underneath frequency response
     if (focusedBand >= 0 && focusedBand < Constants::numBands)
@@ -266,7 +265,7 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
         node.position = { freqToX(node.freq, bounds), gainToY(node.gain, bounds) };
 
         // fill ellipse with transparent background of appropriate colour
-        float alpha = (nodeUnderMouse == i) ? 0.4f : 0.2f;
+        float alpha = (nodeUnderMouse == i || hoveredBand == i) ? 0.4f : 0.2f;
         g.setColour(Constants::bandColours[i].withAlpha(alpha));
         g.fillEllipse(node.position.x - 12, node.position.y - 12, 24, 24);
 
@@ -337,7 +336,7 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
             contourRadius * 2.0f,
             2.0f);
 
-        if (i == nodeUnderMouse || i == nodeBeingDragged || i == hoveredSliderBand)
+        if (i == nodeUnderMouse || i == nodeBeingDragged || i == hoveredBand)
             focusedBand = i;
         
     }
@@ -368,16 +367,14 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
         // If band is enabled, draw frequency response normally. Otherwise make it dashed
         g.setColour(Constants::bandColours[focusedBand].withAlpha(0.9f));
         if (node.isEnabled)
-        {
             g.strokePath(bandPath, juce::PathStrokeType(2.0f));
-        }
         else
         {
             juce::Path dashedPath;
             juce::PathStrokeType stroke(1.0f);
             float dashLengths[] = { 4.0f, 4.0f }; // 4px on, 4px off
 
-            stroke.createDashedStroke(dashedPath, bandPath, dashLengths, 2); // 2 = number of entries in array
+            stroke.createDashedStroke(dashedPath, bandPath, dashLengths, 2);
             g.strokePath(dashedPath, stroke);
         }
 
@@ -512,7 +509,7 @@ void EQUI::configureEQSlider(juce::Slider& slider, juce::Slider::SliderStyle sli
     addAndMakeVisible(slider);
 }
 
-void EQUI::configureEQ()
+void EQUI::configureEQUI()
 {
     // Set up nodes
     for (int i = 0; i < Constants::numBands; ++i)
@@ -521,52 +518,74 @@ void EQUI::configureEQ()
         controls.bandIndex = i;
         bool isPeak = (i >= EQProcessor::Peak1 && i <= EQProcessor::Peak4);
 
+        // Set up gain sliders
+        configureEQSlider(controls.gainSlider, juce::Slider::SliderStyle::LinearBarVertical,
+            Constants::minDb, Constants::maxDb, 0.1, " dB", Constants::defaultGain,
+            Constants::bandColours[i]);
+        controls.gain = controls.gainSlider.getValue();
+        controls.gainSlider.onHoverChanged = [this, i](bool isHovered)
+            {
+                hoveredBand = isHovered ? i : -1;
+            };
+
+        if (!isPeak)
+            controls.gainSlider.setEnabled(false);
+
+        // Set up frequency sliders
         configureEQSlider(controls.freqSlider, juce::Slider::SliderStyle::Rotary, 
             Constants::minFreq, Constants::maxFreq, 1.0, " Hz", Constants::defaultFrequencies[i],
             Constants::bandColours[i]);
         controls.freq = controls.freqSlider.getValue();
         controls.freqSlider.onHoverChanged = [this, i](bool isHovered)
             {
-                hoveredSliderBand = isHovered ? i : -1;
+                hoveredBand = isHovered ? i : -1;
             };
+
+        // Set up Bandwidth sliders
         configureEQSlider(controls.qSlider, juce::Slider::SliderStyle::Rotary, 
             Constants::minQ, Constants::maxQ, 0.1, "", Constants::defaultQs[i],
             Constants::bandColours[i]);
         controls.Q = controls.qSlider.getValue();
         controls.qSlider.onHoverChanged = [this, i](bool isHovered)
             {
-                hoveredSliderBand = isHovered ? i : -1;
+                hoveredBand = isHovered ? i : -1;
             };
 
-        // High-pass and Low-pass should not have a gain slider, only peaking
-        if (isPeak)
-        {
-            configureEQSlider(controls.gainSlider, juce::Slider::SliderStyle::LinearBarVertical, 
-                Constants::minDb, Constants::maxDb, 0.1, " dB", Constants::defaultGain,
-                Constants::bandColours[i]);
-            controls.gain = controls.gainSlider.getValue();
-            controls.gainSlider.onHoverChanged = [this, i](bool isHovered)
-                {
-                    hoveredSliderBand = isHovered ? i : -1;
-                };
-        }
 
-        // Enable bands by default
+        // Setup toggle buttons
         controls.isEnabled = true; 
         controls.enableToggle.setToggleState(true, juce::dontSendNotification);
+        controls.enableToggle.onHoverChanged = [this, i](bool isHovered)
+            {
+                hoveredBand = isHovered ? i : -1;
+            };
 
-        // Implement the custom look and feel
+        // Look and Feel for gain
+        controls.gainLook = std::make_unique<GainLook>(Constants::bandColours[i]);
+        controls.gainSlider.setLookAndFeel(controls.gainLook.get());
+
+        // Look and Feel for toggle button
         controls.toggleLook = std::make_unique<ToggleLook>(Constants::bandColours[i]);
         controls.enableToggle.setLookAndFeel(controls.toggleLook.get());
 
-        // Callback functions
-        controls.freqSlider.onValueChange = [this, i]() { handleSliderChange(i); };
-        controls.qSlider.onValueChange = [this, i]() { handleSliderChange(i); };
+        // Look and Feel for frequency and bandwidth
+        controls.rotaryLook = std::make_unique<RotaryLook>(Constants::bandColours[i]);
+        controls.freqSlider.setLookAndFeel(controls.rotaryLook.get());
+        controls.qSlider.setLookAndFeel(controls.rotaryLook.get());
+
+        // Gain Slider call back function
         if (isPeak)
             controls.gainSlider.onValueChange = [this, i]() { handleSliderChange(i); };
 
+        // Toggle Button call back function
         controls.enableToggle.onClick = [this, i]() { handleToggleButton(i); };
-        addAndMakeVisible(controls.enableToggle);       
+        addAndMakeVisible(controls.enableToggle);
+
+        // Frequency Slider call back function
+        controls.freqSlider.onValueChange = [this, i]() { handleSliderChange(i); };
+
+        // Bandwidth Slider call back function
+        controls.qSlider.onValueChange = [this, i]() { handleSliderChange(i); };   
     }
 }
 
@@ -624,36 +643,36 @@ void EQUI::mouseUp(const juce::MouseEvent&) { nodeBeingDragged = -1; }
 void EQUI::mouseMove(const juce::MouseEvent& e)
 {
     nodeUnderMouse = -1;
+    hoveredBand = -1;
+
+    // 1. Check draggable nodes
     for (size_t i = 0; i < eqNodes.size(); ++i)
     {
         if (eqNodes[i].position.getDistanceFrom(e.position) < 10.0f)
         {
             nodeUnderMouse = (int)i;
-            break;
+            return;
         }
     }
-    
-    // Check if mouse is over a slider label (right panel)
+
+    // 2. Check label hover
     auto sliderBounds = getSliderBounds();
     int bandWidth = sliderBounds.getWidth() / Constants::numBands;
 
     for (int i = 0; i < Constants::numBands; ++i)
     {
         int centerX = sliderBounds.getX() + i * bandWidth + bandWidth / 2;
-        int y = sliderBounds.getY();
+        int y = getLocalBounds().getY() + 20;
+
         juce::Point<float> center((float)centerX, (float)y);
         float radius = 18.0f;
 
         if (e.position.getDistanceFrom(center) < radius)
         {
-            hoveredSliderBand = i;
-            repaint();
+            hoveredBand = i;
             return;
         }
     }
-
-    hoveredSliderBand = -1;
-    repaint();
 }
 
 void EQUI::mouseDrag(const juce::MouseEvent& e)

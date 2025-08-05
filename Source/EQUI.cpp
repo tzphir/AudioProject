@@ -15,7 +15,7 @@ EQUI::EQUI(EQProcessor& processor)
     : eq(processor)
 {
     configureEQUI();
-    magnitudes.resize(512); // points across the frequency range
+    magnitudes.resize(1024); // points across the frequency range
     startTimerHz(30); // refresh at 30 fps
 }
 
@@ -207,32 +207,44 @@ void EQUI::drawGraphSetup(juce::Graphics& g, juce::Rectangle<int> bounds)
 
 void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
-    const int width = bounds.getWidth();
-
+    const int numPoints = magnitudes.size();
     juce::Path responsePath;
+    bool drawing = false;
 
     // Get decibel values
-    for (int i = 0; i < magnitudes.size(); ++i)
+    for (int i = 0; i < numPoints; ++i)
     {
-        double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, 
-            (double)i / (magnitudes.size() - 1));
+        double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq,
+            (double)i / (numPoints - 1));
         auto magnitude = eq.getMagnitudeForFrequency(freq, eq.getSampleRate());
         magnitudes[i] = juce::Decibels::gainToDecibels(magnitude);
     }
 
-    // Fetch from magnitude
-    for (int i = 0; i < magnitudes.size(); ++i)
+    // Build path by skipping low dB values
+    for (int i = 0; i < numPoints; ++i)
     {
-        double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq, 
-            (double)i / (magnitudes.size() - 1));
-        int x = freqToX(freq, bounds);
-        float dB = juce::jlimit(Constants::minDb, Constants::maxDb, (float)magnitudes[i]);
-        float y = juce::jmap(dB, Constants::minDb, Constants::maxDb, (float)(bounds.getBottom()), (float)(bounds.getY()));
+        double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq,
+            (double)i / (numPoints - 1));
+        float x = freqToX(freq, bounds);
+        float dB = (float)magnitudes[i];
 
-        if (i == 0)
-            responsePath.startNewSubPath((float)x, y);
+        if (dB < Constants::minDb)
+        {
+            drawing = false; // stop current subpath
+            continue;
+        }
+
+        float y = juce::jmap(dB, Constants::minDb, Constants::maxDb,
+            (float)(bounds.getBottom()), (float)(bounds.getY()));
+
+        if (!drawing)
+        {
+            responsePath.startNewSubPath(x, y);
+            drawing = true;
+        }
         else
-            responsePath.lineTo((float)x, y);
+            responsePath.lineTo(x, y);
+        
     }
 
     int focusedBand = (nodeBeingDragged >= 0) ? nodeBeingDragged :
@@ -261,6 +273,10 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
     for (int i = 0; i < Constants::numBands; i++)
     {
         auto& node = eqNodes[i];
+        /*node.gainLook->setHovered(false);
+        node.toggleLook->setHovered(false);
+        node.frequencyLook->setHovered(false);
+        node.qLook->setHovered(false);*/
         
         node.position = { freqToX(node.freq, bounds), gainToY(node.gain, bounds) };
 
@@ -345,7 +361,14 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
     if (focusedBand >= 0)
     {
         auto& node = eqNodes[focusedBand];
+
+        /*node.gainLook->setHovered(true);
+        node.toggleLook->setHovered(true);
+        node.frequencyLook->setHovered(true);
+        node.qLook->setHovered(true);*/
+
         juce::Path bandPath;
+        bool drawing = false;
 
         for (int j = 0; j < magnitudes.size(); ++j)
         {
@@ -353,21 +376,34 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
                 (double)j / (magnitudes.size() - 1));
             float magnitude = eq.getMagnitudeForBand(focusedBand, freq, eq.getSampleRate());
             float dB = juce::Decibels::gainToDecibels(magnitude);
-            float y = juce::jmap(juce::jlimit(Constants::minDb, Constants::maxDb, dB),
-                Constants::minDb, Constants::maxDb,
-                (float)bounds.getBottom(), (float)bounds.getY());
-            int x = freqToX(freq, bounds);
 
-            if (j == 0)
-                bandPath.startNewSubPath((float)x, y);
+            if (dB < Constants::minDb)
+            {
+                drawing = false;
+                continue;
+            }
+
+            float y = juce::jmap(dB, Constants::minDb, Constants::maxDb,
+                (float)bounds.getBottom(), (float)bounds.getY());
+            float x = freqToX(freq, bounds);
+
+            if (!drawing)
+            {
+                bandPath.startNewSubPath(x, y);
+                drawing = true;
+            }
             else
-                bandPath.lineTo((float)x, y);
+            {
+                bandPath.lineTo(x, y);
+            }
         }
 
         // If band is enabled, draw frequency response normally. Otherwise make it dashed
         g.setColour(Constants::bandColours[focusedBand].withAlpha(0.9f));
         if (node.isEnabled)
+        {
             g.strokePath(bandPath, juce::PathStrokeType(2.0f));
+        }
         else
         {
             juce::Path dashedPath;
@@ -383,7 +419,7 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
             ? juce::String(node.freq / 1000.0f, 1) + " kHz"
             : juce::String((int)node.freq) + " Hz";
 
-        bool isPeak = (node.bandIndex >= EQProcessor::Peak1 && node.bandIndex <= EQProcessor::Peak4);
+        bool isPeak = (focusedBand >= EQProcessor::Peak1 && focusedBand <= EQProcessor::Peak4);
         juce::String gainText = isPeak ? juce::String(juce::roundToInt(node.gain)) + " dB" : juce::String();
 
         float qPercent = juce::jlimit(0.0f, 100.0f,
@@ -408,6 +444,7 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
         g.drawFittedText(line1, x, y1, textWidth, textHeight, juce::Justification::centred, 1);
         g.drawFittedText(line2, x, y2, textWidth, textHeight, juce::Justification::centred, 1);
     }
+
 }
 
 void EQUI::drawLabels(juce::Graphics& g, juce::Rectangle<int> bounds)
@@ -515,77 +552,91 @@ void EQUI::configureEQUI()
     for (int i = 0; i < Constants::numBands; ++i)
     {
         auto& controls = eqNodes[i];
-        controls.bandIndex = i;
         bool isPeak = (i >= EQProcessor::Peak1 && i <= EQProcessor::Peak4);
 
-        // Set up gain sliders
+        // GAIN
+
+        // 1. Set up Look and Feel
+        controls.gainLook = std::make_unique<GainLook>(Constants::bandColours[i]);
+        controls.gainSlider.setLookAndFeel(controls.gainLook.get());
+
+        // 2. Set up EQ Slider
         configureEQSlider(controls.gainSlider, juce::Slider::SliderStyle::LinearBarVertical,
             Constants::minDb, Constants::maxDb, 0.1, " dB", Constants::defaultGain,
             Constants::bandColours[i]);
         controls.gain = controls.gainSlider.getValue();
+
+        // 3. Handle callbacks
+        if (isPeak)
+            controls.gainSlider.onValueChange = [this, i]() { handleSliderChange(i); };
+
         controls.gainSlider.onHoverChanged = [this, i](bool isHovered)
             {
                 hoveredBand = isHovered ? i : -1;
+                eqNodes[i].gainLook->setHovered(isHovered);
             };
 
-        if (!isPeak)
-            controls.gainSlider.setEnabled(false);
 
-        // Set up frequency sliders
+        // TOGGLE BUTTON
+
+        // 1. Set up Look and Feel
+        controls.toggleLook = std::make_unique<ToggleLook>(Constants::bandColours[i]);
+        controls.enableToggle.setLookAndFeel(controls.toggleLook.get());
+
+        // 2. Set up Toggle Button
+        controls.isEnabled = true;
+        controls.enableToggle.setToggleState(true, juce::dontSendNotification);
+        
+        // 3. Handle callbacks (and make visible)
+        controls.enableToggle.onClick = [this, i]() { handleToggleButton(i); };
+        controls.enableToggle.onHoverChanged = [this, i](bool isHovered)
+            {
+                hoveredBand = isHovered ? i : -1;
+                eqNodes[i].toggleLook->setHovered(isHovered);
+            };
+        addAndMakeVisible(controls.enableToggle);
+
+
+        // FREQUENCY
+
+        // 1. Set up Look and Feel
+        controls.frequencyLook = std::make_unique<RotaryLook>(Constants::bandColours[i]);
+        controls.freqSlider.setLookAndFeel(controls.frequencyLook.get());
+
+        // 2. Set up EQ Slider
         configureEQSlider(controls.freqSlider, juce::Slider::SliderStyle::Rotary, 
             Constants::minFreq, Constants::maxFreq, 1.0, " Hz", Constants::defaultFrequencies[i],
             Constants::bandColours[i]);
         controls.freq = controls.freqSlider.getValue();
+
+        // 3. Handle callbacks
+        controls.freqSlider.onValueChange = [this, i]() { handleSliderChange(i); };
         controls.freqSlider.onHoverChanged = [this, i](bool isHovered)
             {
                 hoveredBand = isHovered ? i : -1;
+                eqNodes[i].frequencyLook->setHovered(isHovered);
             };
 
-        // Set up Bandwidth sliders
+
+        // BANDWIDTH
+        
+        // 1. Set up Look and Feel
+        controls.qLook = std::make_unique<RotaryLook>(Constants::bandColours[i]);
+        controls.qSlider.setLookAndFeel(controls.qLook.get());
+
+        // 2. Set up EQ Slider
         configureEQSlider(controls.qSlider, juce::Slider::SliderStyle::Rotary, 
             Constants::minQ, Constants::maxQ, 0.1, "", Constants::defaultQs[i],
             Constants::bandColours[i]);
         controls.Q = controls.qSlider.getValue();
+
+        // 3. Handle callbacks
+        controls.qSlider.onValueChange = [this, i]() { handleSliderChange(i); };
         controls.qSlider.onHoverChanged = [this, i](bool isHovered)
             {
                 hoveredBand = isHovered ? i : -1;
+                eqNodes[i].qLook->setHovered(isHovered);
             };
-
-
-        // Setup toggle buttons
-        controls.isEnabled = true; 
-        controls.enableToggle.setToggleState(true, juce::dontSendNotification);
-        controls.enableToggle.onHoverChanged = [this, i](bool isHovered)
-            {
-                hoveredBand = isHovered ? i : -1;
-            };
-
-        // Look and Feel for gain
-        controls.gainLook = std::make_unique<GainLook>(Constants::bandColours[i]);
-        controls.gainSlider.setLookAndFeel(controls.gainLook.get());
-
-        // Look and Feel for toggle button
-        controls.toggleLook = std::make_unique<ToggleLook>(Constants::bandColours[i]);
-        controls.enableToggle.setLookAndFeel(controls.toggleLook.get());
-
-        // Look and Feel for frequency and bandwidth
-        controls.rotaryLook = std::make_unique<RotaryLook>(Constants::bandColours[i]);
-        controls.freqSlider.setLookAndFeel(controls.rotaryLook.get());
-        controls.qSlider.setLookAndFeel(controls.rotaryLook.get());
-
-        // Gain Slider call back function
-        if (isPeak)
-            controls.gainSlider.onValueChange = [this, i]() { handleSliderChange(i); };
-
-        // Toggle Button call back function
-        controls.enableToggle.onClick = [this, i]() { handleToggleButton(i); };
-        addAndMakeVisible(controls.enableToggle);
-
-        // Frequency Slider call back function
-        controls.freqSlider.onValueChange = [this, i]() { handleSliderChange(i); };
-
-        // Bandwidth Slider call back function
-        controls.qSlider.onValueChange = [this, i]() { handleSliderChange(i); };   
     }
 }
 
@@ -609,11 +660,11 @@ void EQUI::handleNodeChange(int bandIndex)
     // Sync sliders (without triggering callbacks)
     c.freqSlider.setValue(c.freq, juce::dontSendNotification);
     c.qSlider.setValue(c.Q, juce::dontSendNotification);
-    if (c.bandIndex >= EQProcessor::Peak1 && c.bandIndex <= EQProcessor::Peak4)
+    if (bandIndex >= EQProcessor::Peak1 && bandIndex <= EQProcessor::Peak4)
         c.gainSlider.setValue(c.gain, juce::dontSendNotification);
 
     // Update DSP (mouse events already change the node's values)
-    eq.updateEQ(c.bandIndex, c.freq, c.gain, c.Q);
+    eq.updateEQ(bandIndex, c.freq, c.gain, c.Q);
 }
 
 void EQUI::handleToggleButton(int bandIndex)
@@ -685,10 +736,10 @@ void EQUI::mouseDrag(const juce::MouseEvent& e)
     node.freq = juce::jlimit<float>(Constants::minFreq, Constants::maxFreq, xToFreq(e.position.x, bounds));
 
     // Only allow vertical dragging (gain) for peaking filters
-    if (node.bandIndex >= EQProcessor::Peak1 && node.bandIndex <= EQProcessor::Peak4)
+    if (nodeBeingDragged >= EQProcessor::Peak1 && nodeBeingDragged <= EQProcessor::Peak4)
         node.gain = juce::jlimit(Constants::minDb, Constants::maxDb, yToGain(e.position.y, bounds));
     
-    handleNodeChange(node.bandIndex);
+    handleNodeChange(nodeBeingDragged);
 }
 
 void EQUI::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
@@ -698,6 +749,6 @@ void EQUI::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetai
         auto& node = eqNodes[nodeUnderMouse];
         node.Q = juce::jlimit(Constants::minQ, Constants::maxQ, node.Q + wheel.deltaY);
         
-        handleNodeChange(node.bandIndex);
+        handleNodeChange(nodeUnderMouse);
     }
 }

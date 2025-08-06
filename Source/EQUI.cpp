@@ -19,6 +19,17 @@ EQUI::EQUI(EQProcessor& processor)
     startTimerHz(30); // refresh at 30 fps
 }
 
+EQUI::~EQUI()
+{
+    for (auto& node : eqNodes)
+    {
+        node.gainSlider.setLookAndFeel(nullptr);
+        node.freqSlider.setLookAndFeel(nullptr);
+        node.qSlider.setLookAndFeel(nullptr);
+        node.enableToggle.setLookAndFeel(nullptr);
+    }
+}
+
 void EQUI::timerCallback()
 {
     repaint(); // trigger paint at regular intervals
@@ -477,7 +488,7 @@ void EQUI::drawLabels(juce::Graphics& g, juce::Rectangle<int> bounds)
     }
     // Write Freq and BW
     g.setColour(juce::Colours::white.withAlpha(0.5f));
-    g.setFont(12.0f);
+    g.setFont(14.0f);
 
     int rotarySize = 37; // same as in resized()
     int toggleHeight = 10;

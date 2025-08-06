@@ -19,7 +19,7 @@ class EQUI : public juce::Component,
 {
     public:
         EQUI(EQProcessor& processor);
-        ~EQUI() override = default;
+        ~EQUI() override;
 
         void paint(juce::Graphics& g) override;
         void resized() override;

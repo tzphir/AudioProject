@@ -50,11 +50,10 @@ class EQUI : public juce::Component,
         struct GainLook : public juce::LookAndFeel_V4
         {
             juce::Colour colour;
-            float phase;
-            /*bool isInit = false;*/
+            float phase = 0.0f;
             bool isHovered = false;
 
-            GainLook(juce::Colour c) : colour(c), phase(0.0f) {}
+            GainLook(juce::Colour c) : colour(c) {}
 
             void setHovered(bool hovered)
             {
@@ -244,7 +243,7 @@ class EQUI : public juce::Component,
                         }
                     }
 
-                    phase += 0.1f; // speed of pulse
+                    phase += 0.085f; // speed of pulse
                 }
             }
         };

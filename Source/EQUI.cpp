@@ -15,7 +15,7 @@ EQUI::EQUI(EQProcessor& processor)
     : eq(processor)
 {
     configureEQUI();
-    magnitudes.resize(1024); // points across the frequency range
+    magnitudes.resize(512); // points across the frequency range
     startTimerHz(30); // refresh at 30 fps
 }
 
@@ -48,7 +48,7 @@ void EQUI::paint(juce::Graphics& g)
 
 void EQUI::resized()
 {
-    // Only need to resize child components
+    // Only need to resize components (not graph)
     auto sliderBounds = getSliderBounds();
 
     // Divide into 6 equal columns (one per band)
@@ -74,7 +74,7 @@ void EQUI::resized()
         band.gainSlider.setBounds(bandArea.getCentreX() - (gainWidth / 2), y, gainWidth, gainHeight);
 
         // Bounds for toggle button
-        int toggleButtonHeight = getLocalBounds().getHeight() * 0.015;
+        int toggleButtonHeight = 10;
         int toggleButtonWidth = gainWidth;
 
         // Padding for toggle button
@@ -88,10 +88,10 @@ void EQUI::resized()
             toggleButtonHeight);
 
         // Space for rotary knobs
-        y += toggleButtonHeight * 2;
+        y += toggleButtonHeight + 5;
 
         // Frequency knob
-        int rotarySize = getLocalBounds().getHeight() * 0.05;
+        int rotarySize = 37;
         band.freqSlider.setBounds(bandArea.getCentreX() - rotarySize / 2, y, rotarySize, rotarySize);
 
         y += rotarySize;
@@ -109,13 +109,13 @@ juce::Rectangle<int> EQUI::getGraphBounds() const
     auto bounds = getLocalBounds();
 
     // Remove the right panel (slider column)
-    int sliderColumnWidth = static_cast<int>(bounds.getWidth() * 0.2f);
+    int sliderColumnWidth = 275;
     bounds.removeFromRight(sliderColumnWidth);
 
     // Custom padding: left, top, right, bottom
     bounds.removeFromLeft(50);
-    bounds.removeFromRight(30);
     bounds.removeFromTop(50);
+    /*bounds.removeFromRight(20);*/
     bounds.removeFromBottom(100);
 
     return bounds;
@@ -124,12 +124,12 @@ juce::Rectangle<int> EQUI::getGraphBounds() const
 juce::Rectangle<int> EQUI::getSliderBounds() const
 {
     auto bounds = getLocalBounds();
-    int sliderColumnWidth = static_cast<int>(bounds.getWidth() * 0.2f);
+    int sliderColumnWidth = 275;
     auto sliderBounds = bounds.removeFromRight(sliderColumnWidth);
     
     sliderBounds.removeFromLeft(20);
     sliderBounds.removeFromTop(50);
-    sliderBounds.removeFromRight(20);
+    sliderBounds.removeFromRight(10);
     sliderBounds.removeFromBottom(100);
 
     return sliderBounds;
@@ -209,7 +209,6 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
     const int numPoints = magnitudes.size();
     juce::Path responsePath;
-    bool drawing = false;
 
     // Get decibel values
     for (int i = 0; i < numPoints; ++i)
@@ -217,10 +216,12 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
         double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq,
             (double)i / (numPoints - 1));
         auto magnitude = eq.getMagnitudeForFrequency(freq, eq.getSampleRate());
-        magnitudes[i] = juce::Decibels::gainToDecibels(magnitude);
+
+        // Clamp to min dB
+        magnitudes[i] = std::max(juce::Decibels::gainToDecibels(magnitude), Constants::minDb);
     }
 
-    // Build path by skipping low dB values
+    // Build path (continuous across all points)
     for (int i = 0; i < numPoints; ++i)
     {
         double freq = Constants::minFreq * std::pow(Constants::maxFreq / Constants::minFreq,
@@ -228,30 +229,20 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
         float x = freqToX(freq, bounds);
         float dB = (float)magnitudes[i];
 
-        if (dB < Constants::minDb)
-        {
-            drawing = false; // stop current subpath
-            continue;
-        }
-
         float y = juce::jmap(dB, Constants::minDb, Constants::maxDb,
             (float)(bounds.getBottom()), (float)(bounds.getY()));
 
-        if (!drawing)
-        {
+        if (i == 0)
             responsePath.startNewSubPath(x, y);
-            drawing = true;
-        }
         else
             responsePath.lineTo(x, y);
-        
     }
 
     int focusedBand = (nodeBeingDragged >= 0) ? nodeBeingDragged :
         (nodeUnderMouse >= 0) ? nodeUnderMouse :
         hoveredBand;
 
-    // Colour underneath frequency response
+    // Fill area under the curve
     if (focusedBand >= 0 && focusedBand < Constants::numBands)
     {
         juce::Path filledPath = responsePath;
@@ -262,6 +253,7 @@ void EQUI::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<int> bounds)
         g.fillPath(filledPath);
     }
 
+    // Draw frequency response line
     g.setColour(juce::Colours::white);
     g.strokePath(responsePath, juce::PathStrokeType(2.0f));
 }
@@ -389,9 +381,8 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
         // If band is enabled, draw frequency response normally. Otherwise make it dashed
         g.setColour(Constants::bandColours[focusedBand].withAlpha(0.9f));
         if (node.isEnabled)
-        {
             g.strokePath(bandPath, juce::PathStrokeType(2.0f));
-        }
+        
         else
         {
             juce::Path dashedPath;
@@ -438,19 +429,19 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
 void EQUI::drawLabels(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
     int bandWidth = bounds.getWidth() / Constants::numBands;
+    int y = bounds.getY() - 25;
 
     for (int i = 0; i < Constants::numBands; ++i)
     {
         auto& node = eqNodes[i];
         int centerX = bounds.getX() + i * bandWidth + bandWidth / 2;
-        int y = getLocalBounds().getY() + 20; // top edge of the slider column
 
         juce::Point<float> center((float)centerX, (float)y);
 
-        float radius = 18.0f; // 1.5x the original 12.0f
+        float radius = 16.0f;
 
         // Colored transparent fill
-        g.setColour(Constants::bandColours[i].withAlpha(0.6f));
+        g.setColour(Constants::bandColours[i].withAlpha(0.7f));
         g.fillEllipse(center.x - radius, center.y - radius, radius * 2, radius * 2);
 
         // Black outline
@@ -459,7 +450,7 @@ void EQUI::drawLabels(juce::Graphics& g, juce::Rectangle<int> bounds)
 
         // Label text
         juce::String label = juce::String(i + 1);
-        g.setFont(30.0f); // Slightly bigger font to match size
+        g.setFont(26.0f); // Slightly bigger font to match size
 
         // Draw black outline pass
         g.setColour(juce::Colours::black);
@@ -478,12 +469,33 @@ void EQUI::drawLabels(juce::Graphics& g, juce::Rectangle<int> bounds)
         }
 
         // Draw foreground label
-        g.setColour(Constants::bandColours[i].interpolatedWith(juce::Colours::white, 0.75f));
+        g.setColour(Constants::bandColours[i].interpolatedWith(juce::Colours::white, 0.7f));
         g.drawText(label,
             center.x - radius, center.y - radius,
             radius * 2, radius * 2,
             juce::Justification::centred, false);
     }
+    // Write Freq and BW
+    g.setColour(juce::Colours::white.withAlpha(0.5f));
+    g.setFont(12.0f);
+
+    int rotarySize = 37; // same as in resized()
+    int toggleHeight = 10;
+    int gap = 5;
+
+    // Starting from top of gain slider
+    int gainHeight = bounds.getHeight();
+
+    int freqY = bounds.getY() + gainHeight + toggleHeight + gap + (rotarySize / 2) + 2;
+    int bwY = freqY + rotarySize;
+
+    int labelX = bounds.getX() - 25; // Left margin for text
+    int labelWidth = 40;
+    int labelHeight = 16;
+
+    g.drawFittedText("Freq", labelX, freqY, labelWidth, labelHeight, juce::Justification::left, 1);
+    g.drawFittedText("BW", labelX + 5, bwY, labelWidth, labelHeight, juce::Justification::left, 1);
+
 }
 
 

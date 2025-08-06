@@ -273,11 +273,6 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
     for (int i = 0; i < Constants::numBands; i++)
     {
         auto& node = eqNodes[i];
-        /*node.gainLook->setHovered(false);
-        node.toggleLook->setHovered(false);
-        node.frequencyLook->setHovered(false);
-        node.qLook->setHovered(false);*/
-        
         node.position = { freqToX(node.freq, bounds), gainToY(node.gain, bounds) };
 
         // fill ellipse with transparent background of appropriate colour
@@ -354,19 +349,12 @@ void EQUI::drawNodes(juce::Graphics& g, juce::Rectangle<int> bounds)
 
         if (i == nodeUnderMouse || i == nodeBeingDragged || i == hoveredBand)
             focusedBand = i;
-        
     }
 
     // Draw focused band path last
     if (focusedBand >= 0)
     {
         auto& node = eqNodes[focusedBand];
-
-        /*node.gainLook->setHovered(true);
-        node.toggleLook->setHovered(true);
-        node.frequencyLook->setHovered(true);
-        node.qLook->setHovered(true);*/
-
         juce::Path bandPath;
         bool drawing = false;
 

@@ -51,10 +51,10 @@ class EQUI : public juce::Component,
         {
             juce::Colour colour;
             float phase;
-            bool isInit = false;
+            /*bool isInit = false;*/
             bool isHovered = false;
 
-            GainLook(juce::Colour c) : colour(c) {}
+            GainLook(juce::Colour c) : colour(c), phase(0.0f) {}
 
             void setHovered(bool hovered)
             {
@@ -71,13 +71,6 @@ class EQUI : public juce::Component,
                 auto rectangle = juce::Rectangle<float>((float)x, (float)y, (float)width, (float)height);
                 float heightPulse = 0.175f * height;
                 float radius = 2.0f;
-
-                // One-time random init
-                if (!isInit)
-                {
-                    phase = juce::Random::getSystemRandom().nextFloat() * (height - heightPulse);
-                    isInit = true;
-                }
 
                 // Filled area (sliderPos is Y in vertical slider)
                 float fillTop = sliderPos;
@@ -165,7 +158,7 @@ class EQUI : public juce::Component,
         struct RotaryLook : public juce::LookAndFeel_V4
         {
             juce::Colour colour;
-            float phase;
+            float phase = 0.0f;
             bool isInit = false;
             bool isHovered = false;
 
@@ -184,44 +177,76 @@ class EQUI : public juce::Component,
                 auto bounds = juce::Rectangle<float>(x, y, width, height).reduced(6.0f);
                 auto center = bounds.getCentre();
                 float radius = bounds.getWidth() / 2.0f;
+                float ringPulse = 0.25f * juce::MathConstants<float>::pi; // width of glow in radians
+
+                // One-time random init
+                if (!isInit)
+                {
+                    phase = juce::Random::getSystemRandom().nextFloat() * (1.0f - ringPulse);
+                    isInit = true;
+                }
 
                 float angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
-                // Background arc
+                // --- Background arc
                 juce::Path backgroundArc;
                 backgroundArc.addCentredArc(center.x, center.y, radius, radius,
                     0.0f, rotaryStartAngle, rotaryEndAngle, true);
                 g.setColour(juce::Colours::darkgrey.withAlpha(0.6f));
                 g.strokePath(backgroundArc, juce::PathStrokeType(4.0f));
 
-                // Solid value arc (main foreground arc)
+                // --- Solid value arc
                 juce::Path valueArc;
                 valueArc.addCentredArc(center.x, center.y, radius, radius,
                     0.0f, rotaryStartAngle, angle, true);
                 g.setColour(isHovered ? colour : colour.withAlpha(0.8f));
                 g.strokePath(valueArc, juce::PathStrokeType(4.0f));
 
-                // Glow trail (overlay gradient arc effect)
-                const int numSteps = 30; // resolution of glow trail
-                float step = (angle - rotaryStartAngle) / (float)numSteps;
+                // --- Glow pulse arc (with overflow protection)
+                float arcLength = angle - rotaryStartAngle;
 
-                for (int i = 0; i < numSteps; ++i)
+                if (arcLength > ringPulse)
                 {
-                    float start = rotaryStartAngle + i * step;
-                    float end = start + step;
+                    // Reset phase if glow is fully outside arc
+                    if (phase > (arcLength + ringPulse))
+                        phase = -ringPulse;
 
-                    float alpha = 0.6f * (1.0f - (float)i / (float)numSteps); // fade out
-                    juce::Colour glow = colour.brighter(0.7f).withAlpha(alpha);
+                    float rawStart = phase;
+                    float rawEnd = phase + ringPulse;
 
-                    juce::Path glowArc;
-                    glowArc.addCentredArc(center.x, center.y, radius, radius,
-                        0.0f, start, end, true);
+                    float visibleStart = std::max(0.0f, rawStart);
+                    float visibleEnd = std::min(arcLength, rawEnd);
 
-                    g.setColour(glow);
-                    g.strokePath(glowArc, juce::PathStrokeType(2.5f));
+                    float glowStart = rotaryStartAngle + visibleStart;
+                    float glowEnd = rotaryStartAngle + visibleEnd;
+                    float visibleWidth = visibleEnd - visibleStart;
+
+                    if (visibleWidth > 0.0f)
+                    {
+                        const int numSteps = 20;
+                        float step = visibleWidth / (float)numSteps;
+
+                        for (int i = 0; i < numSteps; ++i)
+                        {
+                            float localStart = glowStart + i * step;
+                            float localEnd = localStart + step;
+
+                            float t = (float)i / (float)numSteps;
+                            float alpha = (isHovered ? 1.0f : 0.8f) * t; // fade out
+                            juce::Colour gradColour = colour.brighter(5.0f).withAlpha(alpha);
+
+                            juce::Path segmentArc;
+                            segmentArc.addCentredArc(center.x, center.y, radius, radius,
+                                0.0f, localStart, localEnd, true);
+
+                            g.setColour(gradColour);
+                            g.strokePath(segmentArc, juce::PathStrokeType(4.0f));
+                        }
+                    }
+
+                    phase += 0.1f; // speed of pulse
                 }
             }
-
         };
 
         // Structure for an individual node
